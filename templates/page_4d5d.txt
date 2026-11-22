@@ -1,0 +1,501 @@
+<title>BIM 4D 5D viewer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}<\/script>
+<style>
+.m5 .v4{display:none!important}body:not(.m5) .v5{display:none!important}
+/* Layout: 3D stage (two buildings, Update left / Baseline right) with a timeline bar, and an analytics column on the right. Palette: ink panels, amber accent, red/green reserved for schedule variance. */
+:root{--bg:#0f1318;--panel:#171c22;--panel2:#1e252c;--line:#2b333b;--fg:#e8ebee;--mute:#97a2ac;--acc:#f0b43f;--red:#e5594f;--grn:#46b378;--blu:#5b9bd5;--sky1:#9db8cf;--sky2:#e6edf3;--font:'IBM Plex Sans Arabic','Segoe UI',system-ui,sans-serif;--num:'Space Grotesk','IBM Plex Sans Arabic',system-ui,sans-serif}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#eef1f4;--panel:#fff;--panel2:#f2f5f7;--line:#d9dfe4;--fg:#1c2329;--mute:#5d6872;--acc:#b97800;--red:#c8372d;--grn:#1f8a55;--blu:#2f6fb0;color-scheme:light}}
+:root[data-theme="light"]{--bg:#eef1f4;--panel:#fff;--panel2:#f2f5f7;--line:#d9dfe4;--fg:#1c2329;--mute:#5d6872;--acc:#b97800;--red:#c8372d;--grn:#1f8a55;--blu:#2f6fb0;color-scheme:light}
+:root{color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){color-scheme:light}}
+html,body{height:100%}body{background:var(--bg);color:var(--fg);font:13px/1.5 var(--font);overflow:hidden}*{box-sizing:border-box}
+#app{display:grid;grid-template-columns:1fr 400px;height:100%;direction:ltr;padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+#stage{position:relative;min-width:0;background:linear-gradient(var(--sky1),var(--sky2))}canvas#cv{display:block;width:100%;height:100%;outline:none}
+.chip{background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--fg)}
+#top{position:absolute;left:12px;top:12px;right:12px;display:flex;gap:8px;flex-wrap:wrap;direction:rtl;justify-content:flex-start;pointer-events:none}
+#top .chip{pointer-events:auto}
+#datechip{font:600 15px var(--font)}#datechip b{color:var(--acc);font-family:var(--num)}
+#bar{position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:10px;align-items:center;direction:rtl;padding:8px 12px}
+#bar input[type=range]{flex:1;min-width:80px;accent-color:var(--acc);direction:ltr}
+button,select{font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}button:hover{border-color:var(--acc)}
+button.on{background:var(--acc);color:#1a1405;border-color:var(--acc)}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+#legend{position:absolute;left:12px;bottom:70px;display:flex;flex-direction:column;gap:5px;direction:rtl}
+#legend .chip{display:flex;gap:8px;align-items:center;font-size:12px}.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+#tools{position:absolute;left:12px;top:60px;display:flex;gap:6px;flex-wrap:wrap;direction:rtl;max-width:70%}
+aside{direction:rtl;display:flex;flex-direction:column;min-height:0;background:var(--panel);border-right:1px solid var(--line);overflow:auto}
+aside header{padding:12px 14px;border-bottom:1px solid var(--line)}aside h1{margin:0;font:700 17px var(--font)}aside header p{margin:2px 0 0;color:var(--mute);font-size:12px}
+section.blk{padding:12px 14px;border-bottom:1px solid var(--line)}
+section.blk h3{margin:0 0 8px;font:600 12px var(--font);color:var(--mute)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.k{background:var(--panel2);border-radius:8px;padding:8px 10px}.k small{display:block;color:var(--mute);font-size:11px}.k b{font:700 19px var(--num)}.k i{font-style:normal;font-size:11px;color:var(--mute)}
+.bad{color:var(--red)}.good{color:var(--grn)}
+canvas.ch{width:100%;height:150px;display:block;direction:ltr}
+.leg{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:11px;color:var(--mute)}.leg span{display:flex;align-items:center;gap:4px}
+.fl{display:grid;grid-template-columns:34px 1fr 54px 14px;gap:4px 8px;align-items:center;font-size:12px}
+.fl .bars{position:relative;height:14px;background:var(--panel2);border-radius:3px;direction:ltr}.fl .bars i{position:absolute;left:0;height:6px;border-radius:2px}.fl .bars i.b{top:0;background:var(--blu)}.fl .bars i.u{top:7px;background:var(--acc)}
+.fl .d{width:10px;height:10px;border-radius:50%}
+.fl span.n{font-family:var(--num);direction:ltr;text-align:left;color:var(--mute)}
+ul.al{list-style:none;margin:0;padding:0;font-size:12px}ul.al li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:5px 0;border-bottom:1px solid var(--line)}ul.al small{color:var(--mute)}
+.xb{font:inherit;font-size:12px;padding:6px 11px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);cursor:pointer}.xb:hover{border-color:var(--acc)}
+.note{color:var(--mute);font-size:11px}
+@media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:55% 45%}aside{border-right:0;border-top:1px solid var(--line)}#tools{max-width:100%}#legend{display:none}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div id="app">
+<div id="stage"><canvas id="cv" tabindex="0" aria-label="مجسم 4D للمشروع: الفعلي والمتوقع مقابل المخطط"></canvas>
+<div id="top"><div class="chip" id="datechip">تاريخ البيانات · <b id="dtxt">–</b></div><div class="chip" id="c_work">العمالة: <b id="c_w">–</b></div><div class="chip" id="c_prog">التقدم: <b id="c_p">–</b></div><div class="chip" id="c_act">الأنشطة الجارية: <b id="c_a">–</b></div></div>
+<div id="tools"><button data-v="both" class="on">الاتنين</button><button data-v="upd">الفعلي والمتوقع</button><button data-v="base">المخطط</button><button data-v="top">من فوق</button><button id="tg_var" class="on">تلوين الفروقات</button><button id="tg_wk" class="on">العمالة</button><select id="cutsel" aria-label="قطع دور"><option value="">قطع دور: بدون</option></select></div>
+<div id="legend"></div>
+<div class="chip" id="bar"><button id="play">▶ تشغيل</button><select id="spd" aria-label="السرعة"><option value="0.5">×0.5</option><option value="1" selected>×1</option><option value="2">×2</option><option value="4">×4</option></select><button id="gdd">تاريخ المتابعة</button><input id="sl" type="range" min="0" max="300" step="1" value="0" aria-label="التاريخ"><span id="dlab" style="min-width:110px;text-align:center;font-family:var(--num)"></span></div></div>
+<aside>
+<header><h1 id="h1t">4D</h1><p id="h1p">البيز لاين والفعلي والمتوقع، العمالة والونش، على نفس المجسم</p>
+<div id="xio5" class="v5" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button id="xi5" class="xb">⬆ استيراد كوست ريبورت</button><button id="xe5" class="xb">⬇ تصدير كوست ريبورت</button><button id="xr5" class="xb">↺ رجوع للأصل</button><input id="xf5" type="file" accept=".xlsx" hidden></div>
+<div id="xio" class="v4" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button id="xi" class="xb">⬆ استيراد Excel (تحديث)</button><button id="xe" class="xb">⬇ تصدير Excel</button><button id="xr" class="xb">↺ رجوع للأصل</button><input id="xf" type="file" accept=".xlsx" hidden></div><div id="xmsg" class="note" style="margin-top:6px"></div></header>
+<div class="v5" id="c5"><section class="blk"><div class="kpis" id="kp5"></div></section>
+<section class="blk"><h3>منحنى التكلفة التراكمي (جنيه): المخطط / المنجز / الفعلي</h3><canvas class="ch" id="cc1" style="height:190px"></canvas><div class="leg"><span><i class="sw" style="background:var(--blu)"></i>المخطط PV</span><span><i class="sw" style="background:var(--acc)"></i>المنجز EV</span><span><i class="sw" style="background:var(--red)"></i>الفعلي AC</span><span>المنقط = متوقع</span></div></section>
+<section class="blk"><h3>التدفق النقدي الشهري (جنيه)</h3><canvas class="ch" id="cc2" style="height:170px"></canvas><div class="leg"><span><i class="sw" style="background:var(--blu)"></i>المخطط</span><span><i class="sw" style="background:var(--red)"></i>فعلي/متوقع</span></div></section>
+<section class="blk"><h3>حسب الدور</h3><div style="overflow-x:auto" id="tf5"></div></section>
+<section class="blk"><h3>حسب بند الميزانية</h3><div style="overflow-x:auto" id="tb5"></div></section>
+<section class="blk"><h3>أعلى الأنشطة تجاوزًا للتكلفة (AC − EV)</h3><div style="overflow-x:auto" id="ta5"></div></section>
+<section class="blk"><p class="note">أسعار الميزانية (تكلفة الدراسة) من شيت التكاليف (READ). المنجز EV = سعر الميزانية × الكمية المنفذة فعليًا. مفيش علاقة بأسعار العميل. التكلفة الفعلية سيناريو تخيلي بمعاملات أسعار افتراضية (ASSUMED) — استورد كوست ريبورت بالأرقام الفعلية لتحديثها. تكلفة مباشرة فقط بالجنيه المصري.</p></section></div>
+<section class="blk v4"><div class="kpis" id="kpis"></div></section>
+<section class="blk v4"><h3>منحنى التقدم: المخطط مقابل الفعلي (وزن بحجم الخرسانة)</h3><canvas class="ch" id="sc" style="height:170px"></canvas><div class="leg"><span><i class="sw" style="background:var(--blu)"></i>المخطط</span><span><i class="sw" style="background:var(--acc)"></i>الفعلي</span><span><i class="sw" style="background:var(--acc);opacity:.45"></i>المتوقع</span></div></section>
+<section class="blk v4"><h3>العمالة اليومية حسب التخصص (الفعلي) والمخطط بخط أبيض</h3><canvas class="ch" id="lc" style="height:170px"></canvas><div class="leg" id="llg"></div></section>
+<section class="blk v4"><h3>العمالة حسب التخصص اليوم: الفعلي / المخطط</h3><div id="trt"></div></section>
+<section class="blk v4"><h3>الأنشطة: منفذ / جاري / لم يبدأ</h3><div id="asum"></div><div id="aflt" style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0"></div><div id="alist" style="max-height:360px;overflow:auto"></div></section>
+<section class="blk v4"><h3>مصادر التأخير (من أين جه؟)</h3><div id="dsrc"></div></section>
+<section class="blk v4"><h3>تقدم كل دور: المخطط (أزرق) والفعلي (أصفر)</h3><div class="fl" id="fl"></div></section>
+<section class="blk v4"><h3>أنشطة جارية في المجسم الفعلي</h3><ul class="al" id="al"></ul></section>
+<section class="blk v4"><p class="note">بيانات الفعلي والعمالة الفعلية في هذه النسخة تحديث تجريبي لحد تاريخ البيانات، وتتبدّل بسجلات الموقع. مكان الونش وأطقم العمالة افتراضات (ASSUMED). كل عنصر مربوط بأنشطة البرنامج، والعناصر والأنشطة جاهزة لربط التكلفة (5D).</p></section>
+</aside></div>
+<script type="application/json" id="d4">__DATA__<\/script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const D=JSON.parse(document.getElementById('d4').textContent);const MODE5=D.mode==='5d';if(MODE5)document.body.classList.add('m5');
+const $=s=>document.querySelector(s);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C=D.cfg,CX=C.cx,[BX0,BX1,BY0,BY1]=C.bbox,SPN=Math.max(1,(BX1-BX0)/61.3,(BY1-BY0)/22),OFFJ=new Set((C.off_weekdays||[4]).map(p=>(p+1)%7)),ND=D.dates.length, DD=D.dd, OX=[0,Math.round(BX1-BX0+34)];const GX0=-120*SPN,GX1=260*SPN+OX[1]-95,RZ=BY1+15.16,MX=CX+OX[1]/2;       // building 0 = update (left), 1 = baseline (right)
+const T0=new Date(D.start+'T00:00:00Z').getTime(), DAY=864e5;
+const dms=D.dates.map(s=>new Date(s+'T00:00:00Z').getTime());
+const fmt=ms=>new Date(ms).toLocaleDateString('ar-EG-u-nu-latn',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+const idxAt=cd=>{const t=T0+cd*DAY;let lo=0,hi=ND-1;if(t<dms[0])return 0;while(lo<hi){const m=(lo+hi+1)>>1;if(dms[m]<=t)lo=m;else hi=m-1}return lo};
+const MAXCD=Math.round((dms[ND-1]-T0)/DAY)+2;
+const FL=C.floors;
+const FAR=C.floor_names_ar;
+const KIND=C.kind;
+const WT=C.weights;
+// ---------- elements prep ----------
+const EL=D.els;
+EL.forEach(e=>{const w=WT[e.gr];e.ts=e.k.map((c,i)=>({c,w:w[i],kind:KIND[D.acts[c].s],a:D.acts[c].a}))});
+const TOTV=EL.reduce((a,e)=>a+e.v,0);
+// state of element e in building b (0 update, 1 baseline) at day index d
+function frac(a,b,d){const s=b===1?a[0]:a[2],f=b===1?a[1]:a[3];if(d<s)return 0;if(d>f)return 1;return (d-s+1)/(f-s+1)}
+function elState(e,b,d){let p=0,k=-1,fk=0;
+ for(let i=0;i<e.ts.length;i++){const t=e.ts[i],fr=frac(t.a,b,d);p+=t.w*fr;if(fr>0){k=i;fk=fr}}
+ if(k<0)return{p:0,st:0};
+ const t=e.ts[k];let st; // 1 form,2 rebar,3 pour,4 done
+ if(t.kind==='pour')st=fk>=1?4:3;else st=t.kind==='rebar'?2:1;
+ const last=e.ts[e.ts.length-1].a;const fin=b===1?last[1]:last[3];
+ return{p,st,fc:b===0&&fin>DD}}
+// ---------- renderer ----------
+const cv=$('#cv'),stage=$('#stage');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;R.localClippingEnabled=true;R.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();let cam=new THREE.PerspectiveCamera(38,1,.5,1200*SPN);cam.position.set(MX-18,95*SPN,190*SPN);
+const ctl=new OrbitControls(cam,cv);ctl.enableDamping=true;ctl.target.set(MX,5,(BY0+BY1)/2);ctl.maxPolarAngle=Math.PI*.49;
+const hemi=new THREE.HemisphereLight(0xdfe9f3,0x6b6558,1);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff2dd,2.3);sun.position.set(-30,90,70);sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);
+Object.assign(sun.shadow.camera,{left:-60*SPN,right:180*SPN+OX[1]-95,top:80*SPN,bottom:-60*SPN,near:1,far:320*SPN});sun.shadow.bias=-.0006;sun.target.position.set(MX,0,(BY0+BY1)/2+5);scene.add(sun,sun.target);
+// ---------- site ----------
+const M=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.95,...o});const GY=-.03;
+{const sh=new THREE.Shape([[GX0,-(BY1+109*SPN)],[GX1,-(BY1+109*SPN)],[GX1,69*SPN-BY0],[GX0,69*SPN-BY0]].map(p=>new THREE.Vector2(...p)));
+ OX.forEach(o=>sh.holes.push(new THREE.Path([[o+BX0-3,-(BY1+5.7)],[o+BX1+3,-(BY1+5.7)],[o+BX1+3,-(BY0-5.9)],[o+BX0-3,-(BY0-5.9)]].map(p=>new THREE.Vector2(...p)))));
+ const g=new THREE.Mesh(new THREE.ShapeGeometry(sh),M(0x74805f));g.rotation.x=-Math.PI/2;g.position.y=GY;g.receiveShadow=true;scene.add(g)}
+const pit=new THREE.Mesh(new THREE.PlaneGeometry((GX1-GX0)*1.1,300*SPN),M(0x6d6a62));pit.rotation.x=-Math.PI/2;pit.position.set((GX0+GX1)/2,D.levels.FND-1.15,0);pit.receiveShadow=true;scene.add(pit);
+const box=(x0,x1,z0,z1,y,c)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(x1-x0,y,z1-z0),M(c));m.position.set((x0+x1)/2,GY+y/2,(z0+z1)/2);m.receiveShadow=true;scene.add(m)};
+box(GX0,GX1,BY1+6.2,BY1+9.2,.17,0xbab7ae);box(GX0,GX1,BY1+21.2,BY1+24.7,.17,0xbab7ae);
+const road=new THREE.Mesh(new THREE.PlaneGeometry(GX1-GX0,12),M(0x32353a,{roughness:.8}));road.rotation.x=-Math.PI/2;road.position.set((GX0+GX1)/2,.03,RZ);road.receiveShadow=true;scene.add(road);
+const lineM=new THREE.MeshBasicMaterial({color:0xe9e6d8}),dm=new THREE.Matrix4();
+const dash=new THREE.InstancedMesh(new THREE.BoxGeometry(3,.02,.18),lineM,Math.ceil((GX1-GX0)/6));for(let i=0;i<Math.ceil((GX1-GX0)/6);i++){dm.makeTranslation(GX0+5+i*6,.05,RZ);dash.setMatrixAt(i,dm)}scene.add(dash);
+[RZ-5.7,RZ+5.7].forEach(z=>{const l=new THREE.Mesh(new THREE.BoxGeometry(GX1-GX0,.02,.14),lineM);l.position.set((GX0+GX1)/2,.05,z);scene.add(l)});
+for(let i=0;i<9;i++){const s=new THREE.Mesh(new THREE.BoxGeometry(.5,.02,11),lineM);s.position.set(MX+i*.9,.055,RZ);scene.add(s)}
+[[-60,22,16],[-30,14,20],[0,26,14],[34,18,22],[66,30,18],[100,16,16],[134,24,20],[166,20,18]].forEach(([x,h,w],i)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,16),M(i%2?0x8e969d:0x9aa1a7));b.position.set(x,h/2,BY0-74);b.castShadow=b.receiveShadow=true;scene.add(b)});
+const trunkM=M(0x5b4636),leafM=[M(0x3f6b3a),M(0x4d7c40),M(0x35602f)];
+function tree(x,z,s=1){const g=new THREE.Group();const tr=new THREE.Mesh(new THREE.CylinderGeometry(.14*s,.2*s,2.2*s,6),trunkM);tr.position.y=1.1*s;tr.castShadow=true;g.add(tr);for(let k=0;k<3;k++){const f=new THREE.Mesh(new THREE.IcosahedronGeometry((1.5-k*.25)*s,1),leafM[(k+Math.abs(Math.round(x)))%3]);f.position.set((k-1)*.3*s,(2.9+k*.9)*s,(1-k)*.2*s);f.castShadow=true;g.add(f)}g.position.set(x,.17,z);scene.add(g)}
+for(let x=-20;x<=170;x+=10)tree(x+((x*13)%5)*.4,BY1+7.8,1+((x*3)%4)*.08);for(let x=-25;x<=175;x+=14)tree(x,BY0-15,1.3);
+OX.forEach(o=>{for(let z=BY0-7;z<=BY1+3;z+=8){tree(o+BX0-9,z,1.1);tree(o+BX1+8.5,z,1.1)}});
+for(let x=-15;x<=165;x+=15){const g=new THREE.Group(),pm=M(0x555a60,{metalness:.5,roughness:.6});const p=new THREE.Mesh(new THREE.CylinderGeometry(.08,.11,7.2,8),pm);p.position.y=3.6;g.add(p);const a=new THREE.Mesh(new THREE.BoxGeometry(.08,.08,2.2),pm);a.position.set(0,7.2,1.1);g.add(a);g.position.set(x,.17,BY1+8.2);scene.add(g)}
+// moving traffic
+const carCols=[0xe8e8e8,0xb81f2a,0x1d3b66,0x2b2b2e,0xd0a020,0x7a8088,0x3a7d5c,0xf2f2f2];
+function car(kind,col,dir){const g=new THREE.Group(),L=kind?5:4.4,H=kind?1.25:.72;const b=new THREE.Mesh(new THREE.BoxGeometry(L,H,1.8),M(col,{roughness:.45,metalness:.35}));b.position.y=.28+H/2;b.castShadow=true;g.add(b);
+ const c=new THREE.Mesh(new THREE.BoxGeometry(kind?3.6:2.3,.62,1.65),M(0x1b2530,{roughness:.2}));c.position.set(-.2,.28+H+.31,0);g.add(c);g.rotation.y=dir>0?0:Math.PI;return g}
+const lanes=[[RZ-4.5,-1,9],[RZ-1.5,-1,13],[RZ+1.5,1,12],[RZ+4.5,1,8]],cars=[];let sd=7;const rn=()=>(sd=(sd*16807)%2147483647)/2147483647;
+lanes.forEach(([z,d,v])=>{let x=-110+rn()*20;for(let i=0;i<6;i++){const g=car(rn()<.3?1:0,carCols[Math.floor(rn()*8)],d);g.position.set(x,.03,z);scene.add(g);cars.push({g,v:v*d,x});x+=62+rn()*14}});
+// ---------- element meshes (shared geometry, shared state materials) ----------
+const clipPl=new THREE.Plane(new THREE.Vector3(0,-1,0),100);
+const mk=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.88,clippingPlanes:[clipPl],...o});
+const TC={COL:0xc8704c,WAL:0xcfb58f,SLB:0xc9cdd0,FND:0xa9aeb0,BEAM:0xb7a6cf,CORE:0xc9a27a,STR:0xd8c46a,RAMP:0x9ec7b0};EL_TYPES_FIX:{const _t=new Set(D.els.map(e=>e.t));_t.forEach(t=>{if(!TC[t])TC[t]=0xbbbbbb})}
+function tex(draw,rep){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');draw(g);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,rep);t.anisotropy=4;return t}
+const texForm=tex(g=>{g.fillStyle='#cfa86e';g.fillRect(0,0,128,128);g.strokeStyle='#7d5d30';g.lineWidth=3;for(let i=0;i<4;i++)g.strokeRect(0,i*32,128,32);g.strokeStyle='rgba(90,60,20,.3)';g.lineWidth=1;for(let i=0;i<24;i++){const y=Math.random()*128;g.beginPath();g.moveTo(0,y);g.lineTo(128,y+Math.random()*6-3);g.stroke()}},.55);
+const texRebar=tex(g=>{g.fillStyle='rgba(20,40,60,.30)';g.fillRect(0,0,128,128);g.strokeStyle='#b9d6ee';g.lineWidth=3;for(let i=0;i<=128;i+=32){g.beginPath();g.moveTo(i,0);g.lineTo(i,128);g.stroke();g.beginPath();g.moveTo(0,i);g.lineTo(128,i);g.stroke()}g.strokeStyle='#e9a24a';g.lineWidth=2;for(let i=16;i<128;i+=32){g.beginPath();g.moveTo(i,0);g.lineTo(i,128);g.stroke()}},1.4);
+const MAT={form:mk(0xffffff,{map:texForm,transparent:true,opacity:.9,emissive:0x2a1f0c}),rebar:mk(0xffffff,{map:texRebar,transparent:true,opacity:1,emissive:0x0c1a28,side:THREE.DoubleSide}),pour:mk(0xf2ecd2,{emissive:0x555040}),
+ fc:mk(0xf0b43f,{transparent:true,opacity:.72,emissive:0x40300a})};
+for(const t in TC){MAT['d'+t]=mk(TC[t]);MAT['r'+t]=mk(0xd9544b,{emissive:0x200808});MAT['g'+t]=mk(0x45b277,{emissive:0x07200f})}
+const edgeMat=new THREE.LineBasicMaterial({color:0x1d2227,transparent:true,opacity:.5});
+const SH=g=>{const sh=new THREE.Shape(g.o.map(p=>new THREE.Vector2(p[0],-p[1])));g.h.forEach(h=>sh.holes.push(new THREE.Path(h.map(p=>new THREE.Vector2(p[0],-p[1])))));return sh};
+const bld=[new THREE.Group(),new THREE.Group()];bld.forEach((g,i)=>{g.position.x=OX[i];scene.add(g)});
+const meshes=[[],[]];
+EL.forEach(e=>{const geo=new THREE.ExtrudeGeometry(SH(e.g),{depth:Math.max(e.z1-e.z0,.02),bevelEnabled:false});geo.rotateX(-Math.PI/2);geo.translate(0,e.z0,0);
+ const eg=new THREE.EdgesGeometry(geo,35);
+ for(let b=0;b<2;b++){const m=new THREE.Mesh(geo,MAT.pour);m.castShadow=m.receiveShadow=true;m.add(new THREE.LineSegments(eg,edgeMat));m.visible=false;bld[b].add(m);meshes[b].push(m)}});
+// ---------- elements helpers ----------
+const LVL={};FL.forEach(f=>LVL[f]=D.levels[f]!==undefined?D.levels[f]:D.levels.FND);
+const FIDX={};FL.forEach((f,i)=>FIDX[f]=i);
+const BELOW=C.below;
+function inPoly(x,y,pts){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])c=!c}return c}
+function inEl(e,x,y){if(!inPoly(x,y,e.g.o))return false;for(const h of e.g.h)if(inPoly(x,y,h))return false;return true}
+function bbox(e){if(e.bb)return e.bb;let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;e.g.o.forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1])});return e.bb=[x0,x1,y0,y1]}
+function gridPts(e,step=1.3){if(e.gp)return e.gp;const [x0,x1,y0,y1]=bbox(e);const o=[];for(let x=x0+step/2;x<x1;x+=step)for(let y=y0+step/2;y<y1;y+=step)if(inEl(e,x,y))o.push([x,y]);return e.gp=o}
+function randIn(e,k){const [x0,x1,y0,y1]=bbox(e);for(let i=0;i<12;i++){const x=x0+hash(k*3.1+i)*(x1-x0),y=y0+hash(k*7.7+i*1.3)*(y1-y0);if(e.t==='SLB'||e.t==='FND'){if(inEl(e,x,y))return[x,y]}else return[x+(hash(k+i)-.5)*3.4,y+(hash(k*2+i)-.5)*3.4]}return[e.x,e.y]}
+const hash=n=>{const x=Math.sin(n*127.1)*43758.5453;return x-Math.floor(x)};
+// ---------- workers (articulated figures, one figure = one worker) ----------
+const MAXW=110,VEST={};for(const k in C.trades)VEST[k]=parseInt((C.trades[k]||'#cccccc').slice(1),16);
+const geo={torso:new THREE.BoxGeometry(.5,.62,.28),leg:new THREE.BoxGeometry(.19,.82,.21),arm:new THREE.BoxGeometry(.13,.6,.14),head:new THREE.SphereGeometry(.15,10,8),helm:new THREE.SphereGeometry(.19,10,6,0,Math.PI*2,0,Math.PI/2)};
+const WM={};
+for(let b=0;b<2;b++){const mi=(g,c,n,col)=>{const m=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({color:c,roughness:.75}),n);m.castShadow=true;m.count=0;m.frustumCulled=false;scene.add(m);return m};
+ WM[b]={torso:mi(geo.torso,0xffffff,MAXW),leg:mi(geo.leg,0x28364f,MAXW*2),arm:mi(geo.arm,0xd6dadd,MAXW*2),head:mi(geo.head,0xc99a72,MAXW),helm:mi(geo.helm,0xffffff,MAXW)}}
+let workers=[[],[]];let showWk=true;
+function planWorkers(b,d){const H=Math.round(b===0?D.up[d]:D.pl[d]);const list=[];let tot=0;
+ for(const c in D.acts){const a=D.acts[c];if(a.t!=='task')continue;const s=b===1?a.a[0]:a.a[2],f=b===1?a.a[1]:a.a[3];if(d>=s&&d<=f&&a.l>0){list.push({c,a});tot+=a.l}}
+ const out=[];const els=new Map();
+ list.forEach((t,ti)=>{const share=H*t.a.l/tot;const cr=t.a.cr;let ls=0;for(const k in cr)if(VEST[k])ls+=cr[k];
+  let es=els.get(t.c);if(!es){es=EL.filter(e=>e.k.includes(t.c));els.set(t.c,es)}
+  const kind=KIND[t.a.s];
+  for(const k in cr){if(!VEST[k])continue;const n=Math.round(share*cr[k]/ls);
+   for(let j=0;j<n&&out.length<MAXW;j++){const kk=ti*131+j*17+k.charCodeAt(0);let x,y,z;
+    if(es.length){const e=es[(j*3+ti)%es.length];const p=randIn(e,kk);x=p[0];z=p[1];y=(e.t==='SLB'||e.t==='FND')?e.z1:e.z0}else{x=CX+(hash(kk)-.5)*16;z=BY0-14+(hash(kk*3)-.5)*8;y=.1}
+    let mode='walk';if(k==='SF'&&(kind==='rebar'||kind==='form'))mode='tie';else if(k==='CA'&&kind==='form')mode='hammer';else if(k==='CG'&&kind==='pour')mode='shovel';else if(k==='SV')mode='look';else if(k==='CRC')mode='look';
+    out.push({k,x,y,z,mode,ph:hash(kk*1.7)*6.28,sp:.7+hash(kk*2.3)*.7,rg:1.2+hash(kk*5.9)*2.6,ang:hash(kk*9.1)*6.28})}}});
+ workers[b]=out;
+ const col=new THREE.Color();WM[b].torso.count=0;out.forEach((w,i)=>{col.set(VEST[w.k]);WM[b].torso.setColorAt(i,col);col.set(w.k==='SV'?0xe5594f:w.k==='CRC'?0xf2d024:0xf3f3ee);WM[b].helm.setColorAt(i,col)});
+ if(WM[b].torso.instanceColor){WM[b].torso.instanceColor.needsUpdate=true;WM[b].helm.instanceColor.needsUpdate=true}}
+const mA=new THREE.Matrix4(),mB=new THREE.Matrix4(),mC=new THREE.Matrix4(),mR=new THREE.Matrix4(),mW=new THREE.Matrix4(),v3=new THREE.Vector3();
+const SW=1.45;
+function part(M,idx,pos,rx,off){ // M root; pos hip/shoulder pivot (xyz); rx rotation; off local offset
+ mA.makeTranslation(pos[0],pos[1],pos[2]);mR.makeRotationX(rx);mB.makeTranslation(off[0],off[1],off[2]);return mW.copy(M).multiply(mA).multiply(mR).multiply(mB)}
+const ROOT=new THREE.Matrix4();
+function animWorkers(t){for(let b=0;b<2;b++){const L=showWk?workers[b]:[];const W=WM[b];W.torso.count=W.head.count=W.helm.count=L.length;W.leg.count=W.arm.count=L.length*2;
+ L.forEach((w,i)=>{const T=t*.001*w.sp+w.ph;let px=w.x+OX[b],pz=w.z,py=w.y,psi=w.ang,al=0,aL=0,aR=0,lL=0,lR=0;
+  if(w.mode==='walk'){const s=Math.sin(T*.9);px+=Math.cos(w.ang)*s*w.rg;pz+=Math.sin(w.ang)*s*w.rg;psi=Math.atan2(Math.cos(w.ang)*Math.cos(T*.9)*Math.sign(1),Math.sin(w.ang)*Math.cos(T*.9));const g=T*7;lL=Math.sin(g)*.6;lR=-lL;aL=-lL*.8;aR=-lR*.8;al=.05}
+  else if(w.mode==='tie'){al=1.05;aL=aR=-1.1+Math.sin(T*9)*.25;lL=-.15;lR=.15}
+  else if(w.mode==='hammer'){al=.25;aR=-1.4+Math.sin(T*8)*.8;aL=-.6}
+  else if(w.mode==='shovel'){al=.5;const s=Math.sin(T*3);aL=aR=-.6-s*.5;lL=s*.2;lR=-s*.2}
+  else{al=.03;aR=Math.sin(T)*.08;aL=-.1}
+  ROOT.makeRotationY(psi);mC.makeTranslation(px,py+.02,pz);ROOT.premultiply(mC);mC.makeScale(SW,SW,SW);ROOT.multiply(mC);
+  W.torso.setMatrixAt(i,part(ROOT,0,[0,.82,0],al,[0,.31,0]));
+  W.head.setMatrixAt(i,part(ROOT,0,[0,.82,0],al,[0,.82,0]));
+  W.helm.setMatrixAt(i,part(ROOT,0,[0,.82,0],al,[0,.88,0]));
+  W.leg.setMatrixAt(i*2,part(ROOT,0,[-.12,.82,0],lL,[0,-.41,0]));W.leg.setMatrixAt(i*2+1,part(ROOT,0,[.12,.82,0],lR,[0,-.41,0]));
+  W.arm.setMatrixAt(i*2,part(ROOT,0,[-.32,.82,0],al+aL,[0,.22,0]));W.arm.setMatrixAt(i*2+1,part(ROOT,0,[.32,.82,0],al+aR,[0,.22,0]))});
+ for(const k in W)W[k].instanceMatrix.needsUpdate=true}}
+// ---------- formwork props ----------
+const propMat=new THREE.MeshStandardMaterial({color:0x8d9399,roughness:.5,metalness:.6});
+const propsIM=[0,1].map(()=>{const m=new THREE.InstancedMesh(new THREE.CylinderGeometry(.045,.045,1,6),propMat,16000);m.count=0;m.frustumCulled=false;m.castShadow=false;scene.add(m);return m});
+function updateProps(b,d,st){const im=propsIM[b];let n=0;const m4=new THREE.Matrix4(),sc2=new THREE.Vector3(),q2=new THREE.Quaternion(),p2=new THREE.Vector3();
+ EL.forEach((e,i)=>{if(e.t!=='SLB')return;const s=st[b][i];if(!s.st)return;const fin=b===1?e.ts[e.ts.length-1].a[1]:e.ts[e.ts.length-1].a[3];if(s.st===4&&d-fin>6)return;const base=BELOW[e.f];if(base===undefined)return;const h=e.z0-base-0.02;if(h<.5)return;
+  gridPts(e).forEach(p=>{if(n>=16000)return;p2.set(p[0]+OX[b],base+h/2,p[1]);sc2.set(1,h,1);m4.compose(p2,q2,sc2);im.setMatrixAt(n++,m4)})});
+ im.count=n;im.instanceMatrix.needsUpdate=true}
+// ---------- perimeter scaffold + safety net ----------
+const scMat=new THREE.LineBasicMaterial({color:0x9aa1a8}),netMat=new THREE.MeshBasicMaterial({color:0x2f9e62,transparent:true,opacity:.32,side:THREE.DoubleSide,depthWrite:false});
+const scaf=[0,1].map(b=>{const l=new THREE.LineSegments(new THREE.BufferGeometry(),scMat),m=new THREE.Mesh(new THREE.BufferGeometry(),netMat);l.frustumCulled=m.frustumCulled=false;bld[b].add(l,m);return{l,m,key:''}});
+function ringArea(r){let a=0;for(let i=0;i<r.length-1;i++)a+=r[i][0]*r[i+1][1]-r[i+1][0]*r[i][1];return a/2}
+function buildScaffold(b,fromF,toF){return;const key=fromF+'-'+toF;if(scaf[b].key===key)return;scaf[b].key=key;const P=[],Q=[];
+ for(const r of D.rings){const sg=Math.sign(ringArea(r))||1;for(let i=0;i<r.length-1;i++){let [x0,y0]=r[i],[x1,y1]=r[i+1];const dx=x1-x0,dy=y1-y0,L=Math.hypot(dx,dy);if(L<.3)continue;const nx=dy/L*sg*.55,ny=-dx/L*sg*.55;x0+=nx;y0+=ny;x1+=nx;y1+=ny;
+  for(let f=fromF;f<=toF;f++){const z0=LVL[FL[f]],z1=z0+3.1;const np=Math.max(1,Math.round(L/2.4));
+   for(let k=0;k<=np;k++){const x=x0+dx*k/np,y=y0+dy*k/np;P.push(x,z0,y,x,z1+1.0,y)}
+   for(const hh of [0.3,1.1,2.0,3.1]){P.push(x0,z0+hh,y0,x1,z0+hh,y1)}
+   Q.push(x0,z0+.3,y0,x1,z0+.3,y1,x1,z1,y1, x0,z0+.3,y0,x1,z1,y1,x0,z1,y0)}}}
+ scaf[b].l.geometry.dispose();scaf[b].m.geometry.dispose();
+ const g1=new THREE.BufferGeometry();g1.setAttribute('position',new THREE.Float32BufferAttribute(P,3));scaf[b].l.geometry=g1;
+ const g2=new THREE.BufferGeometry();g2.setAttribute('position',new THREE.Float32BufferAttribute(Q,3));scaf[b].m.geometry=g2}
+// ---------- site works: fence, cabins, yards, gate sign ----------
+function siteWorks(o){const g=new THREE.Group();g.position.x=o;scene.add(g);
+ const fm=M(0x2f6b50,{roughness:.8}),post=M(0x5a5f64);const seg=(x0,z0,x1,z1)=>{const L=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.round(L/2.4));const dx=(x1-x0)/n,dz=(z1-z0)/n;for(let i=0;i<n;i++){const p=new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx,dz)-.05,2.2,.08),fm);p.position.set(x0+dx*(i+.5),1.1,z0+dz*(i+.5));p.rotation.y=-Math.atan2(dz,dx);p.castShadow=true;g.add(p)}};
+ seg(BX0-6,BY0-26,BX1+6,BY0-26);seg(BX0-6,BY0-26,BX0-6,BY1+6);seg(BX1+6,BY0-26,BX1+6,BY1+6);seg(BX0-6,BY1+6,CX-8.65,BY1+6);seg(CX+3.35,BY1+6,BX1+6,BY1+6);
+ const gm=M(0x2d4a7a);[[CX-8.65,BY1+6],[CX+3.35,BY1+6]].forEach(([x,z])=>{const p=new THREE.Mesh(new THREE.BoxGeometry(.3,3,.3),post);p.position.set(x,1.5,z);g.add(p)});
+ const door=new THREE.Mesh(new THREE.BoxGeometry(5.5,2.2,.1),gm);door.position.set(CX-5.65,1.1,BY1+6);door.rotation.y=-.9;g.add(door);const door2=door.clone();door2.position.x=CX+.35;door2.rotation.y=.9;g.add(door2);
+ const cab=(x,z,y,c)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(6,2.6,2.5),M(c,{roughness:.6}));m.position.set(x,1.3+y,z);m.castShadow=m.receiveShadow=true;g.add(m);const r=new THREE.Mesh(new THREE.BoxGeometry(6.2,.15,2.7),M(0x4a4f55));r.position.set(x,2.65+y,z);g.add(r);for(let i=0;i<3;i++){const w=new THREE.Mesh(new THREE.BoxGeometry(.9,.7,.05),M(0x253546));w.position.set(x-2+i*2,1.6+y,z+1.28);g.add(w)}};
+ cab(BX0,BY0-22,0,0xeceff1);cab(BX0+7,BY0-22,0,0xeceff1);cab(BX0,BY0-22,2.6,0xd8e3ee);cab(BX0+14,BY0-22,0,0xeceff1);cab(BX0+21,BY0-22,0,0xe3ecf3);
+ // rebar yard
+ const rb=M(0x4c5963,{metalness:.5,roughness:.5});for(let r=0;r<4;r++)for(let k=0;k<3;k++){const m=new THREE.Mesh(new THREE.BoxGeometry(9,.35,.9),rb);m.position.set(CX-2.65,.2+k*.37,BY0-23+r*1.25);m.castShadow=true;g.add(m)}
+ for(let r=0;r<3;r++)for(let k=0;k<4;k++){const m=new THREE.Mesh(new THREE.BoxGeometry(2.4,.2,1.2),M(0xc59b62));m.position.set(CX+11.35+r*2.6,.12+k*.22,BY0-22.4);m.castShadow=true;g.add(m)}
+ for(let r=0;r<2;r++){const m=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.6,1.6),M(0x87909a,{metalness:.4}));m.position.set(CX+21.35+r*2,.8,BY0-22.5);g.add(m)}
+ const tk=new THREE.Mesh(new THREE.CylinderGeometry(1,1,2.2,14),M(0x2a76b6));tk.position.set(BX1-1.4,1.1,BY0-22);g.add(tk);
+ // site gate sign
+ const c=document.createElement('canvas');c.width=512;c.height=160;const x=c.getContext('2d');x.fillStyle='#1d3a5f';x.fillRect(0,0,512,160);x.fillStyle='#f0b43f';x.font='bold 54px IBM Plex Sans Arabic, sans-serif';x.textAlign='center';x.fillText(C.name_ar,256,70);x.fillStyle='#fff';x.font='28px sans-serif';x.fillText(C.subtitle||'Structural Works',256,120);
+ const sg=new THREE.Mesh(new THREE.PlaneGeometry(9,2.8),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));sg.position.set(CX-2.65,5.2,BY1+6.1);g.add(sg);
+ [-3,3].forEach(dx=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,4,6),post);p.position.set(CX-2.65+dx*1.4,2.9,BY1+6.05);g.add(p)})}
+OX.forEach(siteWorks);
+// ---------- pump truck + mixers ----------
+function mixer(){const g=new THREE.Group();const ch=new THREE.Mesh(new THREE.BoxGeometry(8,.7,2.5),M(0x30343a));ch.position.y=.8;g.add(ch);const cab=new THREE.Mesh(new THREE.BoxGeometry(2.2,2.2,2.4),M(0xf2f2f2));cab.position.set(3.4,1.9,0);g.add(cab);
+ const dr=new THREE.Mesh(new THREE.CylinderGeometry(1.25,1.25,5.4,14),M(0xe9aa2c,{roughness:.5}));dr.rotation.z=Math.PI/2;dr.position.set(-.8,2.3,0);dr.rotation.x=.0;dr.castShadow=true;g.add(dr);g.userData.dr=dr;
+ [[-2.5],[2.8],[-3.5]].forEach(([x])=>{[-1.1,1.1].forEach(z=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.35,12),M(0x151515));w.rotation.x=Math.PI/2;w.position.set(x,.55,z);g.add(w)})});return g}
+const PUMPX=CX+5.35,PUMPZ=BY1+12.16;
+const pumps=[0,1].map(b=>{const g=new THREE.Group();const ch=new THREE.Mesh(new THREE.BoxGeometry(9,.8,2.6),M(0xd8402f));ch.position.y=.8;ch.castShadow=true;g.add(ch);const cab=new THREE.Mesh(new THREE.BoxGeometry(2.4,2.3,2.5),M(0xd8402f));cab.position.set(3.8,1.9,0);g.add(cab);
+ [-3.5,3].forEach(x=>[-1.6,1.6].forEach(z=>{const o=new THREE.Mesh(new THREE.BoxGeometry(.5,.2,1.4),M(0x30343a));o.position.set(x,.3,z*1.3);g.add(o)}));
+ g.position.set(OX[b]+PUMPX,0,PUMPZ);g.visible=false;scene.add(g);
+ const seg=[0,1,2].map(()=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,1,8),M(0xd8402f));m.castShadow=true;scene.add(m);m.visible=false;return m});
+ const mx=[mixer(),mixer()];mx.forEach((m,i)=>{m.visible=false;scene.add(m)});
+ const par=[...Array(8)].map(()=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.22,6,6),M(0x9a9a94));m.visible=false;scene.add(m);return m});
+ return{g,seg,mx,par,on:false,tip:new THREE.Vector3(),tg:null}});
+const UPV=new THREE.Vector3(0,1,0),qq=new THREE.Quaternion();
+function seg3(m,a,bq){const dd=v3.copy(bq).sub(a);const L=dd.length();m.position.copy(a).addScaledVector(dd,.5);m.scale.set(1,Math.max(L,.01),1);m.quaternion.setFromUnitVectors(UPV,dd.normalize());m.visible=true}
+function updatePump(p,b,t,dt){const vis=p.on&&showPump;p.g.visible=vis;p.mx.forEach(m=>m.visible=vis);p.seg.forEach(m=>m.visible=vis);p.par.forEach(m=>m.visible=vis&&!!p.tg);
+ if(!vis)return;const piv=new THREE.Vector3(OX[b]+PUMPX-1,3.2,PUMPZ);const tgt=p.tg?new THREE.Vector3(OX[b]+p.tg.x,p.tg.z1+2.2,p.tg.y):piv.clone().add(new THREE.Vector3(0,12,-12));
+ p.tip.lerp(tgt,Math.min(1,dt*1.2));const dist=piv.distanceTo(p.tip);const el=piv.clone().lerp(p.tip,.45);el.y+=Math.min(14,dist*.25);const mid=piv.clone().lerp(p.tip,.8);mid.y+=Math.min(6,dist*.08);
+ seg3(p.seg[0],piv,el);seg3(p.seg[1],el,mid);seg3(p.seg[2],mid,p.tip);
+ p.par.forEach((m,i)=>{const k=((t*.0012+i/8)%1);m.position.set(p.tip.x+(hash(i)-.5)*.5,p.tip.y-k*(p.tip.y-(p.tg?p.tg.z1:0)),p.tip.z+(hash(i*3)-.5)*.5)});
+ // mixer A parked behind pump, mixer B shuttling on the lane
+ p.mx[0].position.set(OX[b]+PUMPX-9.5,0,PUMPZ+.2);p.mx[0].userData.dr.rotation.x=t*.004;
+ const cyc=(t*.00005)%1;p.mx[1].position.set(OX[b]+PUMPX-80+cyc*140,0,RZ+2.2);p.mx[1].rotation.y=0;p.mx[1].userData.dr.rotation.x=t*.004}
+let showPump=true;
+// ---------- cranes ----------
+const CY=D.crane.y,CXs=D.crane.x,JIB=D.crane.jib;const yel=M(0xf2c230,{roughness:.5,metalness:.3}),dark=M(0x3b3f44);
+function makeCrane(){const g=new THREE.Group();const mast=new THREE.Mesh(new THREE.BoxGeometry(1.5,1,1.5),yel);mast.castShadow=true;g.add(mast);
+ const sl=new THREE.Group();g.add(sl);const jib=new THREE.Mesh(new THREE.BoxGeometry(JIB+16,.9,.9),yel);jib.position.x=(JIB-16)/2;jib.castShadow=true;sl.add(jib);
+ const cab=new THREE.Mesh(new THREE.BoxGeometry(2,2,2),yel);cab.position.set(-2,-1.2,0);sl.add(cab);const cw=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.6,1.6),dark);cw.position.set(-13,-.6,0);sl.add(cw);
+ const tr=new THREE.Mesh(new THREE.BoxGeometry(1,.5,1),dark);sl.add(tr);const rope=new THREE.Mesh(new THREE.BoxGeometry(.08,1,.08),dark);sl.add(rope);const load=new THREE.Mesh(new THREE.BoxGeometry(1.6,.9,1.6),M(0x8b6b4a));load.castShadow=true;sl.add(load);
+ const tip=new THREE.Mesh(new THREE.BoxGeometry(.5,3,.5),yel);tip.position.set(0,2,0);sl.add(tip);
+ return{g,mast,sl,tr,rope,load,ang:0,tg:0,rad:20,trad:20,H:14,hook:8}}
+const cr=[makeCrane(),makeCrane()];cr.forEach((c,i)=>{c.g.position.set(OX[i]+CXs,0,CY);scene.add(c.g)});
+// ---------- state application ----------
+let cutTop=null,showVar=true,viewMode='both';const FSTAT={};
+function apply(d){
+ const fl0={},fl1={};FL.forEach(f=>{fl0[f]=[0,0];fl1[f]=[0,0]});
+ const st=[new Array(EL.length),new Array(EL.length)];
+ for(let b=0;b<2;b++)EL.forEach((e,i)=>{const s=elState(e,b,d);st[b][i]=s;const F=(b?fl1:fl0)[e.f];F[0]+=s.p*e.v;F[1]+=e.v});
+ FL.forEach(f=>{const u=fl0[f][0]/fl0[f][1]*100,bs=fl1[f][0]/fl1[f][1]*100;FSTAT[f]={u,b:bs,diff:u-bs}});
+ for(let b=0;b<2;b++)EL.forEach((e,i)=>{const s=st[b][i],m=meshes[b][i];if(!s.st){m.visible=false;return}m.visible=true;
+  if(s.st===1)m.material=MAT.form;else if(s.st===2)m.material=MAT.rebar;else if(s.st===3)m.material=MAT.pour;
+  else if(b===0&&s.fc)m.material=MAT.fc;
+  else{let pre='d';if(b===0&&showVar){const df=FSTAT[e.f].diff;pre=df<-10?'r':df>10?'g':'d'}m.material=MAT[pre+e.t]}});
+ // crane + workers
+ [0,1].forEach(b=>{const c=cr[b];if(!C.crane_on){c.g.visible=false;c.gf=0;planWorkers(b,d);return}const A=D.acts['A1020'].a,Z=D.acts['A9000'].a;const s0=b?A[0]:A[2],f0=b?A[1]:A[3],s1=b?Z[0]:Z[2],f1=b?Z[1]:Z[3];
+  let top=4;meshes[b].forEach((m,i)=>{if(m.visible&&EL[i].z1>top)top=EL[i].z1});c.top=top;
+  let g=0;if(d>=s0&&d<=f1){g=d<=f0?(d-s0+1)/(f0-s0+1):(d>=s1?1-(d-s1+1)/(f1-s1+1):1)}c.g.visible=g>0;c.gf=g;planWorkers(b,d)});
+ [0,1].forEach(b=>{updateProps(b,d,st);
+  const act=[];EL.forEach((e,i)=>{const s0=st[b][i];if(s0.st===3)act.push(e)});pumps[b].on=act.length>0;pumps[b].tg=act.length?act[Math.floor(hash(d+b)*act.length)]:null});
+ updateUI(d,st,fl0,fl1);
+}
+let CUT=null;function setCut(f){CUT=f;clipPl.constant=f?(D.levels[f]!==undefined?Math.min(D.levels[f]+3.3,(D.top&&D.top[f]!==undefined?D.top[f]+.5:1e9)):100):100;if(f==='FND')clipPl.constant=D.levels.FND+1}
+// ---------- analytics ----------
+const cum=[new Float32Array(ND),new Float32Array(ND)];
+for(let d=0;d<ND;d++)for(let b=0;b<2;b++){let s=0;for(const e of EL){let p=0;for(const t of e.ts)p+=t.w*frac(t.a,b,d);s+=p*e.v}cum[b][d]=s/TOTV*100}
+const TR=Object.keys(C.trades),PAL=['#5b9bd5','#d9a05b','#9b8bd0','#7fb88c','#e6d36a','#e5594f','#6fc3c3','#c27ba0'],TC2={};TR.forEach((k,i)=>TC2[k]=PAL[i%PAL.length]);
+$('#llg').innerHTML=TR.map(k=>`<span><i class="sw" style="background:${TC2[k]}"></i>${D.res[k]}</span>`).join('');
+const dpr=Math.min(devicePixelRatio||1,2);
+function setup(c){const w=c.clientWidth,h=c.clientHeight;if(c.width!==w*dpr){c.width=w*dpr;c.height=h*dpr}const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);return[g,w,h]}
+function sCurve(d){const[g,w,h]=setup($('#sc'));const P={l:30,r:8,t:8,b:20},X=i=>P.l+(w-P.l-P.r)*i/(ND-1),Y=v=>h-P.b-(h-P.t-P.b)*v/100;
+ g.font='10px sans-serif';g.strokeStyle=css('--line');g.fillStyle=css('--mute');
+ for(let v=0;v<=100;v+=25){g.beginPath();g.moveTo(P.l,Y(v));g.lineTo(w-P.r,Y(v));g.stroke();g.textAlign='right';g.fillText(v+'%',P.l-4,Y(v)+3)}
+ for(let i=0;i<ND;i+=Math.round(ND/6)){g.textAlign='center';g.fillText(new Date(dms[i]).toLocaleDateString('en-GB',{month:'short',timeZone:'UTC'}),X(i),h-6)}
+ const line=(a,c,from,to,dashed,al)=>{g.beginPath();g.strokeStyle=c;g.globalAlpha=al||1;g.lineWidth=2;g.setLineDash(dashed?[4,3]:[]);for(let i=from;i<=to;i++)i===from?g.moveTo(X(i),Y(a[i])):g.lineTo(X(i),Y(a[i]));g.stroke();g.globalAlpha=1;g.setLineDash([])};
+ line(cum[1],css('--blu'),0,ND-1,false);line(cum[0],css('--acc'),0,DD,false);line(cum[0],css('--acc'),DD,ND-1,true,.6);
+ g.strokeStyle=css('--mute');g.setLineDash([3,3]);g.beginPath();g.moveTo(X(DD),P.t);g.lineTo(X(DD),h-P.b);g.stroke();g.setLineDash([]);
+ g.strokeStyle=css('--fg');g.lineWidth=1.5;g.beginPath();g.moveTo(X(d),P.t);g.lineTo(X(d),h-P.b);g.stroke();
+ [[cum[1][d],css('--blu')],[cum[0][d],css('--acc')]].forEach(([v,c])=>{g.fillStyle=c;g.beginPath();g.arc(X(d),Y(v),4,0,7);g.fill()})}
+function lChart(d){const[g,w,h]=setup($('#lc'));const P={l:30,r:8,t:8,b:20};const mx=Math.max(...D.up,...D.pl)*1.1,bw=(w-P.l-P.r)/ND,Y=v=>h-P.b-(h-P.t-P.b)*v/mx;
+ g.font='10px sans-serif';g.fillStyle=css('--mute');g.strokeStyle=css('--line');
+ for(let v=0;v<=mx;v+=25){g.beginPath();g.moveTo(P.l,Y(v));g.lineTo(w-P.r,Y(v));g.stroke();g.textAlign='right';g.fillText(v,P.l-4,Y(v)+3)}
+ for(let i=0;i<ND;i++){let acc=0;g.globalAlpha=i>DD?.45:1;TR.forEach(k=>{const v=D.upt[k][i];if(!v)return;g.fillStyle=TC2[k];g.fillRect(P.l+i*bw,Y(acc+v),Math.max(bw-.3,.6),Y(acc)-Y(acc+v));acc+=v});g.globalAlpha=1}
+ g.strokeStyle=css('--fg');g.lineWidth=1.3;g.setLineDash([3,2]);g.beginPath();for(let i=0;i<ND;i++){const x=P.l+(i+.5)*bw;i?g.lineTo(x,Y(D.pl[i])):g.moveTo(x,Y(D.pl[i]))}g.stroke();g.setLineDash([]);
+ g.strokeStyle=css('--acc');g.lineWidth=1.5;g.beginPath();g.moveTo(P.l+d*bw,P.t);g.lineTo(P.l+d*bw,h-P.b);g.stroke();
+ for(let i=0;i<ND;i+=Math.round(ND/6)){g.fillStyle=css('--mute');g.textAlign='center';g.fillText(new Date(dms[i]).toLocaleDateString('en-GB',{month:'short',timeZone:'UTC'}),P.l+i*bw,h-6)}}
+const fl=$('#fl');fl.innerHTML=FL.map(f=>`<span>${FAR[f]}</span><div class="bars"><i class="b" id="fb_${f}"></i><i class="u" id="fu_${f}"></i></div><span class="n" id="fn_${f}"></span><i class="d" id="fd_${f}"></i>`).join('');
+
+// ---------- activity status & delay sources ----------
+const AC=Object.entries(D.acts).filter(([c,a])=>a.t==='task').map(([c,a])=>{const [bs,bf,us,uf]=a.a;let mp=0;for(const q of (a.p||[])){const x=D.acts[q];if(x&&x.t==='task')mp=Math.max(mp,x.a[3]-x.a[1])}
+ const od=(uf-us)-(bf-bs),wt=Math.max(0,(us-bs)-mp);return{c,a,bs,bf,us,uf,ds:us-bs,df:uf-bf,od,wt,src:Math.max(0,od)+wt}});
+let aFlt='all';
+const stOf=(s,f,d)=>d>f?'done':d>=s?'prog':'open';
+function actUI(d){const cnt={done:0,prog:0,open:0,late:0};
+ const rows=AC.map(r=>{const su=stOf(r.us,r.uf,d),sb=stOf(r.bs,r.bf,d);const pu=Math.round(frac(r.a.a,0,d)*100),pb=Math.round(frac(r.a.a,1,d)*100);const late=pu<pb-0&&(pb-pu)>=10||(r.df>0&&su!=='done'&&d>r.bf);cnt[su]++;if(late)cnt.late++;return{...r,su,sb,pu,pb,late}});
+ $('#asum').innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:12px"><div><b style="font-size:20px;color:var(--grn)">${cnt.done}</b><br>منفذ</div><div><b style="font-size:20px;color:var(--acc)">${cnt.prog}</b><br>جاري</div><div><b style="font-size:20px">${cnt.open}</b><br>لم يبدأ</div><div><b style="font-size:20px;color:var(--red)">${cnt.late}</b><br>متأخر</div></div>`;
+ const F=[['all','الكل'],['done','منفذ'],['prog','جاري'],['open','لم يبدأ'],['late','متأخر']];
+ $('#aflt').innerHTML=F.map(([k,n])=>`<button data-f="${k}" class="${aFlt===k?'on':''}" style="font:inherit;font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid var(--line);background:${aFlt===k?'var(--acc)':'transparent'};color:inherit;cursor:pointer">${n}</button>`).join('');
+ $('#aflt').querySelectorAll('button').forEach(b=>b.onclick=()=>{aFlt=b.dataset.f;actUI(d)});
+ const CH={done:['منفذ','#2e9e5b'],prog:['جاري','#d9962b'],open:['لم يبدأ','#8a949e']};
+ $('#alist').innerHTML=rows.filter(r=>aFlt==='all'||(aFlt==='late'?r.late:r.su===aFlt)).map(r=>{const c=CH[r.su];
+  const why=r.df<=0?'':(r.od>0?`مدة +${r.od}ي`:'')+(r.wt>0?` بداية +${r.wt}ي`:'')||`موروث ${r.df}ي`;
+  return `<div style="display:grid;grid-template-columns:48px 1fr auto;gap:6px;padding:5px 0;border-bottom:1px solid var(--line);font-size:11.5px;align-items:center"><span style="font-family:var(--num);opacity:.6">${r.c}</span><span>${r.a.n}<br><small style="opacity:.7">مخطط ${r.pb}% · فعلي ${r.pu}%${r.df>0?` · <b style="color:var(--red)">تأخر ${r.df}ي${why?' ('+why+')':''}</b>`:r.df<0?` · <b style="color:var(--grn)">سبق ${-r.df}ي</b>`:''}</small></span><span style="background:${c[1]};color:#fff;border-radius:10px;padding:2px 8px;font-size:10.5px;white-space:nowrap">${c[0]}</span></div>`}).join('');
+ const top=AC.filter(r=>r.src>0).sort((a,b)=>b.src-a.src).slice(0,8),mx=top.length?top[0].src:1;
+ $('#dsrc').innerHTML=(top.length?top.map(r=>`<div style="font-size:11.5px;margin:4px 0"><div style="display:flex;justify-content:space-between"><span>${r.c} · ${r.a.n}</span><b style="font-family:var(--num)">+${r.src}ي</b></div><div style="height:6px;background:var(--line);border-radius:3px"><div style="height:6px;width:${r.src/mx*100}%;background:var(--red);border-radius:3px"></div></div><small style="opacity:.7">${r.od>0?'زيادة مدة التنفيذ +'+r.od+'ي ':''}${r.wt>0?'بداية متأخرة +'+r.wt+'ي':''}</small></div>`).join(''):'لا تأخير')+`<div style="font-size:11px;opacity:.7;margin-top:6px">التأخير الكلي ${D.delay} يوم = مجموع التأخير الذي أضافته الأنشطة الحرجة (زيادة المدة + التأخير في البداية بعد انتهاء السوابق).</div>`}
+function updateUI(d,st,fl0,fl1){actUI(d);if(MODE5&&window.__cost5)setTimeout(()=>__cost5.draw(d),0);
+ const pb=cum[1][d],pu=cum[0][d],spi=pb>0?pu/pb:1,dd=d>DD;
+ $('#dtxt').textContent=fmt(dms[Math.min(d,ND-1)]);
+ const wk0=D.pl[d],wk1=D.up[d];$('#c_w').textContent=`${Math.round(wk1)} فعلي${dd?' (متوقع)':''} / ${Math.round(wk0)} مخطط`;
+ $('#c_p').textContent=`${pu.toFixed(1)}% فعلي / ${pb.toFixed(1)}% مخطط`;
+ const act=Object.values(D.acts).filter(a=>a.t==='task'&&d>=a.a[2]&&d<=a.a[3]);$('#c_a').textContent=act.length;
+ const pk0=Math.max(...D.pl),pk1=Math.max(...D.up);
+ const dl=D.delay;
+ $('#kpis').innerHTML=[['التقدم المخطط',pb.toFixed(1)+'%',''],['التقدم الفعلي'+(dd?' (متوقع)':''),pu.toFixed(1)+'%',''],['SPI',spi.toFixed(2),`<i class="${spi<.95?'bad':spi>1.05?'good':''}">${spi<.95?'متأخر':spi>1.05?'سابق':'مطابق'}</i>`],
+  ['العمالة اليوم (فعلي)',Math.round(wk1),`<i>المخطط ${Math.round(wk0)}</i>`],['ذروة العمالة',Math.round(pk1),`<i>المخطط ${Math.round(pk0)}</i>`],['التأخير المتوقع',dl+' يوم',`<i>على الانتهاء</i>`]].map(([a,b,c])=>`<div class="k"><small>${a}</small><b>${b}</b> ${c}</div>`).join('');
+ FL.forEach(f=>{const s=FSTAT[f];$('#fb_'+f).style.width=s.b+'%';$('#fu_'+f).style.width=s.u+'%';$('#fn_'+f).textContent=`${s.u.toFixed(0)}/${s.b.toFixed(0)}`;$('#fd_'+f).style.background=s.diff<-10?css('--red'):s.diff>10?css('--grn'):'transparent'});
+ $('#al').innerHTML=act.slice(0,9).map(a=>{const p=Math.round(frac(a.a,0,d)*100),pb=Math.round(frac(a.a,1,d)*100),df=p-pb;return `<li><span>${a.n}</span><b style="font-family:var(--num)">${p}%</b><small>المخطط ${pb}%</small><small class="${df<-10?'bad':df>10?'good':''}">${df<-10?'متأخر':df>10?'سابق':'مطابق'}</small></li>`}).join('')||'<li><span>لا توجد أنشطة جارية</span></li>';
+ {const cnt=[{},{}];[0,1].forEach(b=>workers[b].forEach(w=>cnt[b][w.k]=(cnt[b][w.k]||0)+1));
+ $('#trt').innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse">'+Object.keys(VEST).map(k=>`<tr><td><i class="sw" style="background:#${VEST[k].toString(16).padStart(6,'0')}"></i> ${D.res[k]||k}</td><td style="text-align:center;font-family:var(--num)"><b>${cnt[0][k]||0}</b> / ${cnt[1][k]||0}</td></tr>`).join('')+'</table>'}
+ sCurve(d);lChart(d)}
+// ---------- UI ----------
+const sl=$('#sl');sl.max=MAXCD;let cd=Math.round((dms[DD]-T0)/DAY),playing=false,last=0,acc=0;
+FL.forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent='قطع عند '+FAR[f];$('#cutsel').appendChild(o)});
+$('#cutsel').onchange=e=>{setCut(e.target.value||null);apply(idxAt(cd))};
+function setCD(v){cd=Math.max(0,Math.min(MAXCD,Math.round(v)));sl.value=cd;const d=idxAt(cd);$('#dlab').textContent=fmt(T0+cd*DAY);apply(d)}
+sl.oninput=()=>setCD(+sl.value);
+$('#play').onclick=e=>{playing=!playing;e.target.textContent=playing?'⏸ إيقاف':'▶ تشغيل';e.target.classList.toggle('on',playing);if(playing&&cd>=MAXCD)setCD(0)};
+$('#gdd').onclick=()=>setCD((dms[DD]-T0)/DAY);
+$('#tg_var').onclick=e=>{showVar=!showVar;e.target.classList.toggle('on',showVar);apply(idxAt(cd))};
+$('#tg_wk').onclick=e=>{showWk=!showWk;e.target.classList.toggle('on',showWk)};
+let tw=null;function fly(p,t,ms=900){const p0=cam.position.clone(),t0=ctl.target.clone(),s=performance.now();tw=n=>{const k=Math.min(1,(n-s)/ms),e=k*k*(3-2*k);cam.position.lerpVectors(p0,p,e);ctl.target.lerpVectors(t0,t,e);if(k>=1)tw=null}}
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('on',x===b));const v=b.dataset.v;
+ if(v==='both')fly(new THREE.Vector3(60,100,200),new THREE.Vector3(78,5,10));
+ if(v==='upd')fly(new THREE.Vector3(28,48,100),new THREE.Vector3(30,8,10));
+ if(v==='base')fly(new THREE.Vector3(125,48,100),new THREE.Vector3(125,8,10));
+ if(v==='top')fly(new THREE.Vector3(78,185,16),new THREE.Vector3(78,0,15))});
+$('#legend').innerHTML=[['--red','متأخر عن المخطط بأكتر من 10 نقاط'],['--grn','سابق المخطط بأكتر من 10 نقاط'],['--acc','متوقع (لسه ما اتنفذش)']].map(([c,t])=>`<div class="chip"><i class="sw" style="background:var(${c})"></i>${t}</div>`).join('')+`<div class="chip"><i class="sw" style="background:#d0a56a"></i>شدة / حديد تحت التنفيذ</div>`;
+// labels
+const LBL=[];function label(t,x,y,z){const c=document.createElement('canvas');c.width=512;c.height=96;const g=c.getContext('2d');g.fillStyle='rgba(20,24,29,.88)';g.beginPath();g.roundRect(4,8,504,80,14);g.fill();g.fillStyle='#f0b43f';g.font='bold 40px IBM Plex Sans Arabic, sans-serif';g.textAlign='center';g.textBaseline='middle';g.direction='rtl';g.fillText(t,256,50);
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));s.position.set(x,y,z);s.scale.set(26,4.9,1);s.renderOrder=10;scene.add(s);const tex=s.material.map;const h={set(a,b){const g=c.getContext('2d');g.clearRect(0,0,512,96);g.fillStyle='rgba(20,24,29,.9)';g.beginPath();g.roundRect(4,4,504,88,14);g.fill();g.textAlign='center';g.fillStyle='#f0b43f';g.font='bold 34px IBM Plex Sans Arabic, sans-serif';g.fillText(a,256,40);g.fillStyle='#fff';g.font='600 30px Space Grotesk, sans-serif';g.fillText(b,256,80);tex.needsUpdate=true}};LBL.push(h);return h}
+setTimeout(()=>{label('الفعلي والمتوقع (Update)',CX,RZ,10);label('المخطط (Baseline)',OX[1]+CX,RZ,10)},800);
+// loop
+let tgt=[null,null],tgtT=0;
+function loop(t){requestAnimationFrame(loop);const dt=Math.min(.1,(t-last)/1000||0);last=t;
+ if(playing){acc+=dt*(+$('#spd').value)*6;while(acc>=1){acc-=1;if(cd>=MAXCD){playing=false;$('#play').textContent='▶ تشغيل';$('#play').classList.remove('on');break}setCD(cd+1)}}
+ if(tw)tw(t);ctl.update();
+ cars.forEach(c=>{c.x+=c.v*dt;if(c.x>170)c.x=-120;if(c.x<-120)c.x=170;c.g.position.x=c.x});
+ const d=idxAt(cd);
+ if(t-tgtT>3500){tgtT=t;[0,1].forEach(b=>{const L=meshes[b].map((m,i)=>[m,i]).filter(([m,i])=>m.visible&&elState(EL[i],b,d).st&&elState(EL[i],b,d).st<4);tgt[b]=L.length?EL[L[Math.floor(Math.random()*L.length)][1]]:null})}
+ cr.forEach((c,b)=>{if(!c.g.visible)return;const H0=Math.max(14,Math.min(46,c.top+10));c.H+=(H0-c.H)*.03;const Hm=c.H*c.gf;c.mast.scale.y=Math.max(Hm,.1);c.mast.position.y=Hm/2;c.sl.position.y=Hm+.5;
+  if(tgt[b]){const dx=tgt[b].x-CXs,dz=tgt[b].y-CY;let a=Math.atan2(dz,dx);let da=a-c.ang;da=Math.atan2(Math.sin(da),Math.cos(da));c.ang+=da*Math.min(1,dt*.9);c.trad=Math.min(JIB-2,Math.max(6,Math.hypot(dx,dz)))}
+  c.rad+=(c.trad-c.rad)*Math.min(1,dt*1.2);c.sl.rotation.y=-c.ang;c.tr.position.set(c.rad,-.6,0);const tz=tgt[b]?tgt[b].z1+2:6;const len=Math.max(1,Math.min(Hm-tz,Hm-1));c.rope.scale.y=len;c.rope.position.set(c.rad,-.6-len/2,0);c.load.position.set(c.rad,-.6-len-.45,0);c.load.visible=!!tgt[b]&&c.gf>=1});
+ animWorkers(t);pumps.forEach((p,b)=>updatePump(p,b,t,dt));R.render(scene,cam)}
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();updateUI(idxAt(cd),null,null,null)}
+new ResizeObserver(()=>{resize()}).observe(stage);
+setCD((dms[DD]-T0)/DAY);resize();loop(0);if(!MODE5)$('#h1t').textContent=C.name_ar+' · 4D';if(MODE5){$('#h1t').textContent=C.name_ar+' · 5D';$('#h1p').textContent='تكلفة المخطط مقابل الفعلي على نفس المجسم، بتاريخ البيانات';setTimeout(()=>__cost5.draw(idxAt(cd)),1000)}
+
+// ---------- Excel import / export ----------
+const XTR=Object.keys(C.trades);
+const serial=iso=>Math.round(new Date(iso+'T00:00:00Z').getTime()/86400000)+25569;
+const isoOf=v=>{if(v==null||v==='')return null;if(typeof v==='number')return new Date(Math.round((v-25569)*86400000)).toISOString().slice(0,10);if(v instanceof Date)return v.toISOString().slice(0,10);const m=String(v).match(/\d{4}-\d{2}-\d{2}/);return m?m[0]:null};
+function exportXlsx(){const R0=5,hd=['Code','Activity / النشاط','Floor','Wing','Step','BL Start','BL Finish','BL Dur (d)','Actual/Fcst Start','Actual/Fcst Finish','% Complete','Dur (d)','Start slip (d)','Finish slip (d)','Dur overrun (d)','Status'].concat(XTR.map(k=>'BL '+k),XTR.map(k=>'Act '+k));
+ const ws={},put=(r,c,v,o={})=>{ws[XLSX.utils.encode_cell({r,c})]=Object.assign({v,t:typeof v==='number'?'n':'s'},o)};
+ put(0,0,C.name+' — 4D Update Sheet / شيت تحديث البرنامج');put(1,0,'Data date / تاريخ البيانات');put(1,3,serial(D.dates[D.dd]),{z:'yyyy-mm-dd'});
+ put(2,0,'عدّل الأعمدة I, J, K و W:AB وتاريخ البيانات D2 فقط ثم استورد الملف في الصفحة.');
+ hd.forEach((h,i)=>put(R0-1,i,h));
+ const wd=(a,b)=>{let n=0;for(let x=a;x<=b;x++)if(!OFFJ.has(new Date((x-25569)*86400000).getUTCDay()))n++;return n};
+ const rows=Object.entries(D.acts).filter(([c,a])=>a.t==='task');
+ rows.forEach(([c,a],i)=>{const r=R0+i,x=r+1,bs=serial(D.dates[a.a[0]]),bf=serial(D.dates[a.a[1]]),us=serial(D.dates[a.a[2]]),uf=serial(D.dates[a.a[3]]);
+  put(r,0,c);put(r,1,a.n);put(r,2,a.f||'');put(r,3,a.w||'');put(r,4,a.s||'');put(r,5,bs,{z:'yyyy-mm-dd'});put(r,6,bf,{z:'yyyy-mm-dd'});
+  put(r,7,wd(bs,bf),{f:`NETWORKDAYS.INTL(F${x},G${x},11)`});put(r,8,us,{z:'yyyy-mm-dd'});put(r,9,uf,{z:'yyyy-mm-dd'});
+  const pc=Math.round(frac(a.a,0,D.dd)*100)/100;put(r,10,pc,{z:'0%'});
+  put(r,11,wd(us,uf),{f:`NETWORKDAYS.INTL(I${x},J${x},11)`});put(r,12,us-bs,{f:`I${x}-F${x}`});put(r,13,uf-bf,{f:`J${x}-G${x}`});put(r,14,wd(us,uf)-wd(bs,bf),{f:`L${x}-H${x}`});
+  put(r,15,pc>=1||uf<serial(D.dates[D.dd])?'منفذ':pc>0||us<=serial(D.dates[D.dd])&&uf>=serial(D.dates[D.dd])?'جاري':'لم يبدأ',{f:`IF(OR(K${x}>=1,J${x}<$D$2),"منفذ",IF(OR(K${x}>0,AND(I${x}<=$D$2,J${x}>=$D$2)),"جاري","لم يبدأ"))`});
+  XTR.forEach((k,j)=>{put(r,16+j,(a.cb||a.cr)[k]||0);put(r,16+XTR.length+j,a.cr[k]||0)})});
+ ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:R0+rows.length-1,c:15+2*XTR.length}});ws['!cols']=[{wch:8},{wch:52},{wch:7},{wch:6},{wch:7},{wch:12},{wch:12}].concat(Array(21).fill({wch:10}));
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Update');
+ const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+ parent.postMessage({bim:'export',filename:C.name.replace(/ /g,'_')+'_4D_Update.xlsx',data:out},'*');$('#xmsg').textContent='تم تجهيز الملف — وافق على الحفظ في النافذة.'}
+function ingest(rows,ddv){const N=JSON.parse(JSON.stringify(D));const dates=N.dates,di={};dates.forEach((x,i)=>di[x]=i);
+ const dayOf=iso=>{if(!iso)return null;while(dates[dates.length-1]<iso){let l=new Date(dates[dates.length-1]+'T00:00:00Z');do{l=new Date(l.getTime()+864e5)}while(OFFJ.has(l.getUTCDay()));const z=l.toISOString().slice(0,10);dates.push(z);di[z]=dates.length-1}
+  if(iso in di)return di[iso];for(let i=0;i<dates.length;i++)if(dates[i]>iso)return i;return null};
+ const flat=(acts,n)=>{const u={};XTR.forEach(k=>u[k]=new Array(n).fill(0));for(const a of Object.values(acts)){if(a.t!=='task')continue;for(let d=a.a[2];d<=a.a[3];d++){if(OFFJ.has(new Date(dates[d]+'T00:00:00Z').getUTCDay()))continue;XTR.forEach(k=>u[k][d]+=a.cr[k]||0)}}return u};
+ const NN=dates.length+400,old=flat(N.acts,NN);let ch=0,err=[];
+ const dd=dayOf(ddv);if(dd!=null)N.dd=dd;
+ rows.forEach(r=>{const c=r[0],a=N.acts[c];if(!a)return;const us=dayOf(isoOf(r[8])),uf=dayOf(isoOf(r[9]));if(us==null||uf==null){err.push(c);return}if(uf<us){err.push(c+' (النهاية قبل البداية)');return}
+  if(us!==a.a[2]||uf!==a.a[3])ch++;a.a[2]=us;a.a[3]=uf;if(!a.cb)a.cb={...a.cr};XTR.forEach((k,i)=>{const v=r[16+XTR.length+i];if(v!=null&&v!=='')a.cr[k]=+v});a.l=Math.round(XTR.reduce((s,k)=>s+(a.cr[k]||0),0)*10)/10});
+ const nw=flat(N.acts,NN),nd=dates.length,ext=a=>{a=a.slice();while(a.length<nd)a.push(0);return a.slice(0,nd)};
+ XTR.forEach(k=>{const b=ext(N.upt[k]);N.upt[k]=b.map((v,i)=>Math.max(0,Math.round((v-old[k][i]+nw[k][i])*10)/10))});
+ N.up=N.upt.SF.map((_,i)=>Math.round(XTR.reduce((s,k)=>s+N.upt[k][i],0)*10)/10);N.pl=ext(N.pl);for(const k in N.plt)N.plt[k]=ext(N.plt[k]);
+ const T=Object.values(N.acts).filter(a=>a.t!=='start_milestone');N.delay=Math.round((new Date(dates[Math.max(...T.map(a=>a.a[3]))])-new Date(dates[Math.max(...T.map(a=>a.a[1]))]))/864e5);
+ return{N,ch,err}}
+$('#xe').onclick=exportXlsx;$('#xi').onclick=()=>$('#xf').click();
+$('#xr').onclick=()=>parent.postMessage({bim:'reset'},'*');
+$('#xf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const ws=wb.Sheets['Update'];if(!ws)throw new Error('شيت Update مش موجود');
+ const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}).slice(5);const ddv=isoOf(ws['D2']&&ws['D2'].v);
+ const{N,ch,err}=ingest(rows,ddv);if(err.length)$('#xmsg').textContent='تحذير: تعذر قراءة '+err.join(', ');
+ parent.postMessage({bim:'newdata',data:N,summary:`اتحدّث ${ch} نشاط · تاريخ البيانات ${N.dates[N.dd]} · التأخير ${N.delay} يوم`},'*')}catch(x){$('#xmsg').textContent='فشل الاستيراد: '+x.message}e.target.value=''};
+if(D.note)$('#xmsg').textContent=D.note;
+
+// ---------- 5D cost mode ----------
+(function(){
+const A=Object.entries(D.acts).filter(([c,a])=>a.t==='task').map(([c,a])=>({c,a,n:a.n,f:a.f||'—',s:a.s,bc:a.bc,q:a.q||0,ac:a.ac||0,b0:a.a[0],b1:a.a[1],u0:a.a[2],u1:a.a[3]}));
+const fr=(s,f,d)=>d<s?0:d>f?1:(d-s+1)/(f-s+1);
+const BAC=A.reduce((s,r)=>s+r.bc,0);
+const PV=new Float64Array(ND),EVf=new Float64Array(ND),ACa=new Float64Array(ND);
+let EV_dd=0,AC_dd=0;
+A.forEach(r=>{const e1=fr(r.u0,r.u1,DD);r.ev=r.bc*e1;EV_dd+=r.ev;AC_dd+=r.ac});
+for(let d=0;d<ND;d++){let p=0,e=0,a=0;A.forEach(r=>{p+=r.bc*fr(r.b0,r.b1,d);e+=r.bc*fr(r.u0,r.u1,d);const e1=fr(r.u0,r.u1,DD);if(e1>0&&d<=DD)a+=r.ac*fr(r.u0,r.u1,d)/e1});PV[d]=p;EVf[d]=e;ACa[d]=a}
+const CPI=AC_dd>0?EV_dd/AC_dd:1,EAC=AC_dd+(BAC-EV_dd)/CPI,PV_dd=PV[DD];
+for(let d=DD+1;d<ND;d++)ACa[d]=AC_dd+(EVf[d]-EV_dd)/CPI;
+const MM=v=>(v/1e6).toFixed(2)+' م',F=v=>Math.round(v).toLocaleString('en-US'),P=v=>(v*100).toFixed(1)+'%';
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MN=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const dt=i=>D.dates[Math.min(Math.max(i,0),ND-1)];
+function kpis(d){const pv=PV[d],ev=EVf[d],ac=ACa[d],fc=d>DD;const cpi=ac>0?ev/ac:1,spi=pv>0?ev/pv:1;
+ const pl=ev-ac,plp=ev>0?pl/ev*100:0,fpl=BAC-EAC;
+ const k=(t,v,s,c='')=>`<div class="k"><small>${t}</small><b class="${c}" style="direction:ltr;unicode-bidi:isolate;display:block;text-align:right">${v}</b> <i>${s||''}</i></div>`;
+ $('#kp5').innerHTML=k('المخطط PV (المفروض)',MM(pv),P(pv/BAC)+' من الميزانية')+k('الفعلي AC',MM(ac),(fc?'متوقع · ':'')+'التكلفة الفعلية')+k('المنجز EV'+(fc?' (متوقع)':''),MM(ev),P(ev/BAC)+' من الميزانية')+
+  k('الربح / الخسارة (EV − AC)',(pl<0?'−':'')+MM(Math.abs(pl)),'EV '+MM(ev)+' − AC '+MM(ac)+' · '+plp.toFixed(1)+'%',pl<0?'bad':'good')+
+  k('CPI',cpi.toFixed(2),cpi<1?'تجاوز تكلفة':'توفير',cpi<.97?'bad':cpi>1.03?'good':'')+k('SPI (قيمة)',spi.toFixed(2),spi<1?'متأخر':'مطابق',spi<.97?'bad':'')+
+  k('EAC المتوقع',MM(EAC),'الميزانية '+MM(BAC),EAC>BAC?'bad':'good')+k('ربح/خسارة عند الإنجاز (BAC − EAC)',(fpl<0?'−':'')+MM(Math.abs(fpl)),'BAC '+MM(BAC)+' − EAC '+MM(EAC),fpl<0?'bad':'good')}
+function chart(id,fn){const c=$(id),w=c.clientWidth||400,h=parseInt(c.style.height)||200,r=devicePixelRatio||1;c.width=w*r;c.height=h*r;const g=c.getContext('2d');g.setTransform(r,0,0,r,0,0);g.clearRect(0,0,w,h);fn(g,w,h)}
+function s1(d){chart('#cc1',(g,w,h)=>{const L=52,R=8,T=8,B=22,mx=Math.max(BAC,EAC)*1.05,X=i=>L+(w-L-R)*i/(ND-1),Y=v=>T+(h-T-B)*(1-v/mx);g.font='10px sans-serif';g.fillStyle=css('--mute');g.strokeStyle=css('--line');
+ for(let k=0;k<=4;k++){const v=mx*k/4;g.beginPath();g.moveTo(L,Y(v));g.lineTo(w-R,Y(v));g.stroke();g.textAlign='right';g.fillText((v/1e6).toFixed(1)+'م',L-4,Y(v)+3)}
+ let last=-9;for(let i=0;i<ND;i++){const m=+dt(i).slice(5,7);if(m!==last&&(i===0||dt(i).slice(8,10)<'09')){last=m;g.textAlign='center';g.fillText(MN[m-1].slice(0,3),X(i),h-6)}}
+ const ln=(a,col,i0,i1,dash,wd=2)=>{g.beginPath();g.setLineDash(dash?[5,4]:[]);g.strokeStyle=col;g.lineWidth=wd;for(let i=i0;i<=i1;i++){i===i0?g.moveTo(X(i),Y(a[i])):g.lineTo(X(i),Y(a[i]))}g.stroke();g.setLineDash([])};
+ ln(PV,css('--blu'),0,ND-1);ln(EVf,css('--acc'),0,DD);ln(EVf,css('--acc'),DD,ND-1,true);ln(ACa,css('--red'),0,DD);ln(ACa,css('--red'),DD,ND-1,true);
+ g.strokeStyle=css('--mute');g.setLineDash([3,3]);g.lineWidth=1;g.beginPath();g.moveTo(X(DD),T);g.lineTo(X(DD),h-B);g.stroke();g.setLineDash([]);
+ g.strokeStyle=css('--fg');g.beginPath();g.moveTo(X(d),T);g.lineTo(X(d),h-B);g.stroke();[[PV,'--blu'],[EVf,'--acc'],[ACa,'--red']].forEach(([a,c])=>{g.fillStyle=css(c);g.beginPath();g.arc(X(d),Y(a[d]),4,0,7);g.fill()})})}
+const MON=(()=>{const m={};for(let i=0;i<ND;i++){const k=dt(i).slice(0,7);(m[k]=m[k]||{p:0,a:0});const pp=i?PV[i]-PV[i-1]:PV[0];m[k].p+=pp;m[k].a+=i?ACa[i]-ACa[i-1]:ACa[0]}return Object.entries(m)})();
+function s2(){chart('#cc2',(g,w,h)=>{const L=52,R=8,T=8,B=22,mx=Math.max(...MON.map(([k,v])=>Math.max(v.p,v.a)))*1.1,n=MON.length,bw=(w-L-R)/n,Y=v=>T+(h-T-B)*(1-v/mx);g.font='10px sans-serif';g.fillStyle=css('--mute');g.strokeStyle=css('--line');
+ for(let k=0;k<=4;k++){const v=mx*k/4;g.beginPath();g.moveTo(L,Y(v));g.lineTo(w-R,Y(v));g.stroke();g.textAlign='right';g.fillText((v/1e6).toFixed(1)+'م',L-4,Y(v)+3)}
+ MON.forEach(([k,v],i)=>{const x=L+i*bw,yy=+k.slice(5);g.fillStyle=css('--blu');g.fillRect(x+bw*.1,Y(v.p),bw*.38,Y(0)-Y(v.p));g.globalAlpha=k>dt(DD).slice(0,7)?.5:1;g.fillStyle=css('--red');g.fillRect(x+bw*.5,Y(v.a),bw*.38,Y(0)-Y(v.a));g.globalAlpha=1;g.fillStyle=css('--mute');g.textAlign='center';g.fillText(MN[yy-1].slice(0,3),x+bw/2,h-6)})})}
+function tables(d){const grp=(key,list)=>{const o={};list.forEach(r=>{const k=key(r);o[k]=o[k]||{bc:0,pv:0,ev:0,ac:0,q:0};o[k].bc+=r.bc;o[k].pv+=r.pv;o[k].ev+=r.ev;o[k].ac+=r.ac;o[k].q+=r.q||0});return o};
+ const tr=(o,ord,q)=>`<table><tr><th></th>${q?'<th>الكمية م³</th>':''}<th>الميزانية</th><th>PV</th><th>EV</th><th>AC</th><th>CPI</th></tr>`+ord.map(k=>{const v=o[k];if(!v)return'';const c=v.ac>0?v.ev/v.ac:null;return`<tr><td>${k}</td>${q?`<td class="n">${F(v.q)}</td>`:''}<td class="n">${F(v.bc)}</td><td class="n">${F(v.pv)}</td><td class="n">${F(v.ev)}</td><td class="n">${F(v.ac)}</td><td class="n ${c&&c<.97?'bad':''}">${c?c.toFixed(2):'—'}</td></tr>`}).join('')+'</table>';
+ const ev=D.els.map(e=>{let pv=0,evv=0,acc=0;e.k.forEach((c,i)=>{const r=A.find(x=>x.c===c),w=WT[e.gr][i],a=D.acts[c];pv+=e.bc*w*fr(r.b0,r.b1,d);const f1=fr(r.u0,r.u1,Math.min(d,DD));evv+=e.bc*w*fr(r.u0,r.u1,d);acc+=d<=DD?e.bc*w*fr(r.u0,r.u1,d)*(a.af||1):e.bc*w*fr(r.u0,r.u1,DD)*(a.af||1)+(e.bc*w*(fr(r.u0,r.u1,d)-fr(r.u0,r.u1,DD)))/CPI});return{f:e.f,bl:e.bl,bc:e.bc,pv,ev:evv,ac:acc,q:e.v}});
+ const FO=FL,fo=grp(r=>r.f,ev);$('#tf5').innerHTML=tr(fo,FO.filter(k=>fo[k]));
+ const bo=grp(r=>r.bl,ev);$('#tb5').innerHTML=tr(bo,Object.keys(bo).sort(),true);
+ const oa=A.map(r=>({r,ev:r.bc*fr(r.u0,r.u1,DD),ac:r.ac})).filter(x=>x.ac>0).map(x=>({...x,v:x.ac-x.ev})).sort((a,b)=>b.v-a.v).slice(0,10);
+ $('#ta5').innerHTML='<table><tr><th>الكود</th><th>النشاط</th><th>EV</th><th>AC</th><th>التجاوز</th><th>%</th></tr>'+oa.map(x=>`<tr><td>${x.r.c}</td><td style="white-space:normal">${x.r.n}</td><td class="n">${F(x.ev)}</td><td class="n">${F(x.ac)}</td><td class="n bad">${F(x.v)}</td><td class="n">${x.ev>0?(x.v/x.ev*100).toFixed(1)+'%':'—'}</td></tr>`).join('')+'</table>'}
+// ---- Excel cost report import / export ----
+const serial5=iso=>Math.round(new Date(iso+'T00:00:00Z').getTime()/86400000)+25569;
+const isoOf5=v=>{if(v==null||v==='')return null;if(typeof v==='number')return new Date(Math.round((v-25569)*86400000)).toISOString().slice(0,10);const m=String(v).match(/\d{4}-\d{2}-\d{2}/);return m?m[0]:null};
+function exportX(){const ws={},put=(r,c,v,o={})=>{ws[XLSX.utils.encode_cell({r,c})]=Object.assign({v,t:typeof v==='number'?'n':'s'},o)};
+ put(0,0,C.name+' — Cost Report (5D) / كوست ريبورت');put(1,0,'Data date / تاريخ البيانات');put(1,3,serial5(D.dates[DD]),{z:'yyyy-mm-dd'});put(2,0,'عدّل AC (العمود O) وتاريخ البيانات D2 فقط (التواريخ بتتعدل من شيت الـ 4D) ثم استورد الملف.');
+ const hd=['Code','Activity / النشاط','Floor','Step','BL Start','BL Finish','Upd Start','Upd Finish','Budget cost (EGP)','Budget qty (m3 eq.)','PV %','EV %','PV (EGP)','EV (EGP)','AC to date (EGP)','CPI','CV = EV-AC','SV = EV-PV','Budget rate (EGP/m3 eq.)'];hd.forEach((h,i)=>put(4,i,h));
+ const f2=(a,b,c)=>`IF($D$2<${a},0,IF($D$2>=${b},1,NETWORKDAYS.INTL(${a},$D$2,11)/NETWORKDAYS.INTL(${a},${b},11)))`;
+ A.forEach((r,i)=>{const R=5+i,x=R+1;put(R,0,r.c);put(R,1,r.n);put(R,2,r.f);put(R,3,r.s);[r.b0,r.b1,r.u0,r.u1].forEach((v,j)=>put(R,4+j,serial5(D.dates[v]),{z:'yyyy-mm-dd'}));
+  put(R,8,Math.round(r.bc*100)/100);put(R,9,Math.round(r.q*1000)/1000);const pv=fr(r.b0,r.b1,DD),ev=fr(r.u0,r.u1,DD);
+  put(R,10,pv,{f:f2('E'+x,'F'+x),z:'0%'});put(R,11,ev,{f:f2('G'+x,'H'+x),z:'0%'});put(R,12,r.bc*pv,{f:`I${x}*K${x}`});put(R,13,r.bc*ev,{f:`S${x}*J${x}*L${x}`});put(R,14,r.ac);
+  put(R,15,r.ac>0?r.bc*ev/r.ac:0,{f:`IF(O${x}>0,N${x}/O${x},0)`});put(R,16,r.bc*ev-r.ac,{f:`N${x}-O${x}`});put(R,17,r.bc*(ev-pv),{f:`N${x}-M${x}`});put(R,18,r.q>0?r.bc/r.q:0,{f:`IF(J${x}>0,I${x}/J${x},0)`})});
+ const last=5+A.length;put(last,1,'TOTAL');['I','J','M','N','O','Q','R'].forEach(c=>{const ci=XLSX.utils.decode_col(c);put(last,ci,0,{f:`SUM(${c}6:${c}${last})`})});
+ ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:last,c:18}});ws['!cols']=[{wch:8},{wch:52},{wch:6},{wch:6}].concat(Array(15).fill({wch:13}));
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Activity Cost');parent.postMessage({bim:'export',filename:C.name.replace(/ /g,'_')+'_Cost_Report.xlsx',data:XLSX.write(wb,{bookType:'xlsx',type:'array'})},'*');$('#xmsg').textContent='تم تجهيز الملف — وافق على الحفظ.'}
+$('#xe5').onclick=exportX;$('#xi5').onclick=()=>$('#xf5').click();$('#xr5').onclick=()=>parent.postMessage({bim:'reset'},'*');
+$('#xf5').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),ws=wb.Sheets['Activity Cost'];if(!ws)throw new Error('شيت Activity Cost مش موجود');
+ const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}).slice(5);const N=JSON.parse(JSON.stringify(D)),di={};N.dates.forEach((x,i)=>di[x]=i);
+ const dayOf=iso=>{if(!iso)return null;if(iso in di)return di[iso];for(let i=0;i<N.dates.length;i++)if(N.dates[i]>iso)return i;return N.dates.length-1};
+ const dd=dayOf(isoOf5(ws['D2']&&ws['D2'].v));if(dd!=null)N.dd=dd;let n=0;
+ rows.forEach(r=>{const a=N.acts[r[0]];if(!a||a.t!=='task')return;const ac=+r[14];if(!isNaN(ac)&&ac!==a.ac){a.ac=ac;n++}});
+ parent.postMessage({bim:'newdata',data:N,tab:'5',summary:`اتحدّث ${n} قيمة في الكوست ريبورت · تاريخ البيانات ${N.dates[N.dd]}`},'*')}catch(x){$('#xmsg').textContent='فشل الاستيراد: '+x.message}e.target.value=''};
+
+const AA=A;
+const chips=d=>{const pv=PV[d],ac=ACa[d];const pl=EVf[d]-ac;
+ $('#c_work').innerHTML='المخطط PV: <b>'+MM(pv)+'</b>';$('#c_prog').innerHTML='الفعلي AC: <b>'+MM(ac)+'</b>';$('#c_act').innerHTML=(pl<0?'خسارة':'ربح')+': <b style="color:'+(pl<0?'var(--red)':'var(--grn)')+'">'+MM(Math.abs(pl))+'</b>';
+ if(LBL[0]){LBL[0].set('الفعلي (Update)','AC '+MM(ac)+' · EV '+MM(EVf[d]));LBL[1].set('المخطط (Baseline)','PV '+MM(pv))}};
+window.__cost5={draw(d){kpis(d);s1(d);s2();tables(d);chips(d)}};
+})();
+window.__4d={setCD,fly,apply,FSTAT,cam,ctl};
+<\/script>

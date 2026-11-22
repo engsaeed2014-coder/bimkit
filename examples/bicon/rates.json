@@ -1,0 +1,104 @@
+{
+ "sheet": "Cost Sheet",
+ "rows": [
+  4,
+  14
+ ],
+ "columns": {
+  "desc": "B",
+  "qty": "D",
+  "cost": "F",
+  "unit": "C"
+ },
+ "cost_is_rate": false,
+ "lines": [
+  {
+   "desc": "Reinforced Concrete 350kg/cm2 for shear and core wall",
+   "qty": 1185.0,
+   "cost": 4194781.5,
+   "unit": "m3",
+   "rate": 3539.9,
+   "row": 4
+  },
+  {
+   "desc": "Reinforced concrete 350 kg/cm2 300mm thick retaining walls",
+   "qty": 717.0,
+   "cost": 2071341.3,
+   "unit": "m3",
+   "rate": 2888.9,
+   "row": 5
+  },
+  {
+   "desc": "Reinforced Concrete 350kg/cm2 for columns",
+   "qty": 1719.0,
+   "cost": 6085088.1,
+   "unit": "m3",
+   "rate": 3539.9,
+   "row": 6
+  },
+  {
+   "desc": "Reinforced Concrete 350kg/cm2 200mm thick flat slabs",
+   "qty": 812.0,
+   "cost": 2260526.8,
+   "unit": "m3",
+   "rate": 2783.9,
+   "row": 7
+  },
+  {
+   "desc": "Reinforced Concrete 350kg/cm2 180mm thick solid slabs",
+   "qty": 248.0,
+   "cost": 690407.2,
+   "unit": "m3",
+   "rate": 2783.9,
+   "row": 8
+  },
+  {
+   "desc": "Reinforced Concrete 350kg/cm2 220mm thick flat slabs",
+   "qty": 132.0,
+   "cost": 367474.8,
+   "unit": "m3",
+   "rate": 2783.9,
+   "row": 9
+  },
+  {
+   "desc": "Reinforced Concrete 350kg/cm2 250mm thick flat slabs",
+   "qty": 7343.0,
+   "cost": 20442177.7,
+   "unit": "m3",
+   "rate": 2783.9,
+   "row": 10
+  },
+  {
+   "desc": "Reinforced Concrete 300 kg/m3 1000mm thick raft foundation",
+   "qty": 6243.0,
+   "cost": 13693396.2,
+   "unit": "m3",
+   "rate": 2193.4,
+   "row": 11
+  },
+  {
+   "desc": "Plain conc 200kg/cm2 100 mm thick for layer under raft",
+   "qty": 6580.0,
+   "cost": 585883.2,
+   "unit": "m2",
+   "rate": 89.04,
+   "row": 12
+  },
+  {
+   "desc": "4mm thick, Bituminous waterproofing membranes for below raft and strip foundation ad outer face of retaining wall",
+   "qty": 12575.0,
+   "cost": 1194625.0,
+   "unit": "m2",
+   "rate": 95.0,
+   "row": 13
+  },
+  {
+   "desc": "Reinforced Concrete 300 kg/m3 1500 mm thick raft foundation",
+   "qty": 174.0,
+   "cost": 381651.6,
+   "unit": "m3",
+   "rate": 2193.4,
+   "row": 14
+  }
+ ]
+}

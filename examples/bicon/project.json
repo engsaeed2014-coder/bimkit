@@ -1,0 +1,110 @@
+{
+  "project": {
+    "name": "Bicon Building",
+    "name_ar": "بايكون بلدنج",
+    "subtitle": "Sheikh Zayed Axis · Structural Works",
+    "code": "BCN",
+    "short_name": "BCN-STR",
+    "currency": "EGP",
+    "file_prefix": "Bicon_Building"
+  },
+  "inputs": {
+    "data": "data.json",
+    "update": "Bicon_Building_Update.xlsx",
+    "rates": "rates.json",
+    "cost_report": null
+  },
+  "calendar": {
+    "name": "6-Day Workweek (Sat-Thu)",
+    "off_weekdays": [4],
+    "holidays": [],
+    "hours_per_day": 8
+  },
+  "schedule": {
+    "start": "2026-02-01",
+    "contract_end": "2027-04-30",
+    "duration_scale": 1.6,
+    "duration_scale_note": "fixed in project.json",
+    "rounding": "ceil",
+    "fnd_floor": "FND",
+    "floors": ["B1", "GF", "F01", "F02", "F03", "F04", "F05", "F06", "F07", "RF"],
+    "floor_names_ar": {
+      "FND": "اللبشة", "B1": "البدروم", "GF": "الدور الأرضي", "F01": "الدور الأول", "F02": "الدور الثاني",
+      "F03": "الدور الثالث", "F04": "الدور الرابع", "F05": "الدور الخامس", "F06": "الدور السادس",
+      "F07": "الدور السابع", "RF": "السطح"
+    },
+    "floor_parts": {"B1": ["VERT"]},
+    "default_floor_parts": ["SLB", "VERT"],
+    "zones": [
+      {"code": "A", "name": "Wing A (axes 01-15)", "name_ar": "الجناح أ (محاور 01-15)", "x_max": 30.65},
+      {"code": "B", "name": "Wing B (axes 16-30)", "name_ar": "الجناح ب (محاور 16-30)", "x_min": 30.65}
+    ],
+    "groups": {"FND": "FND", "SLB": "SLB", "BEAM": "SLB", "STR": "SLB", "RAMP": "SLB", "COL": "VERT", "WAL": "VERT", "CORE": "VERT"},
+    "sequence": {"FND": ["BLN", "RRB", "RPR"], "SLB": ["SF", "SR", "SP"], "VERT": ["CF", "CP"]},
+    "weights": {"FND": [0.2, 0.4, 0.4], "SLB": [0.35, 0.35, 0.3], "VERT": [0.75, 0.25]},
+    "logic": {
+      "zone_ss_lag": 4,
+      "raft_pour_gap": 2,
+      "vertical_after_raft_lag": 3,
+      "slab_after_vertical_lag": 1,
+      "vertical_after_slab_lag": 1
+    },
+    "max_activity_days": 20,
+    "steps": {
+      "MOB": {"name": "Site mobilisation & setting-out", "name_ar": "تجهيز الموقع والتوقيع", "base": 6, "crew": {"GL": 8, "SV": 2}},
+      "CRN": {"name": "Tower crane foundation & erection", "name_ar": "تأسيس وتركيب برج الونش", "base": 8, "crew": {"CRC": 6, "SV": 1, "GL": 2}},
+      "BLN": {"name": "Blinding & waterproofing", "name_ar": "الخرسانة العادية والعزل", "base": 4, "part": "form", "crew": {"GL": 6, "CA": 2, "SV": 1}},
+      "RRB": {"name": "Raft reinforcement & edge formwork", "name_ar": "حديد اللبشة وشدات الحواف", "base": 8, "part": "rebar", "crew": {"SF": 15, "CA": 4, "GL": 5, "SV": 1}},
+      "RPR": {"name": "Raft concrete pour", "name_ar": "صب اللبشة", "base": 2, "part": "pour", "crew": {"CG": 12, "GL": 5, "SV": 2, "PMP": 1}},
+      "SF": {"name": "Slab formwork", "name_ar": "شدة البلاطة", "base": 6, "part": "form", "crew": {"CA": 11, "GL": 5, "SV": 1, "TWC": 0.5, "CRC": 1}},
+      "SR": {"name": "Slab reinforcement", "name_ar": "حديد البلاطة", "base": 5, "part": "rebar", "crew": {"SF": 12, "GL": 4, "SV": 1, "TWC": 0.5, "CRC": 1}},
+      "SP": {"name": "Slab pour", "name_ar": "صب البلاطة", "base": 1, "part": "pour", "crew": {"CG": 10, "CA": 2, "GL": 4, "SV": 2, "PMP": 0.5, "TWC": 0.5, "CRC": 1}},
+      "CF": {"name": "Columns & walls reinforcement and formwork", "name_ar": "حديد وشدة الأعمدة والحوائط", "base": 6, "part": "form", "crew": {"SF": 6, "CA": 8, "GL": 4, "SV": 1, "TWC": 0.5, "CRC": 1}},
+      "CP": {"name": "Columns & walls pour", "name_ar": "صب الأعمدة والحوائط", "base": 1, "part": "pour", "crew": {"CG": 6, "GL": 2, "SV": 1, "PMP": 0.5, "TWC": 0.5, "CRC": 1}},
+      "DIS": {"name": "Tower crane dismantling", "name_ar": "فك برج الونش", "base": 5, "crew": {"CRC": 6, "SV": 1, "GL": 2, "TWC": 1}},
+      "QA": {"name": "Structural survey, as-built & QA documentation", "name_ar": "مساحة وتوثيق وجودة", "base": 10, "crew": {"SV": 2, "GL": 4}}
+    },
+    "crane": {
+      "enabled": true,
+      "type": "Tower crane",
+      "x": 30.65,
+      "y": -9.0,
+      "jib_radius_m": 50,
+      "hook_height_m": 38,
+      "position_confidence": "READ"
+    }
+  },
+  "resources": {
+    "SF": {"name": "Steel fixers", "name_ar": "محارفة حديد", "kind": "labour", "color": "#2f7fd9"},
+    "CA": {"name": "Carpenters", "name_ar": "نجارين مسلح", "kind": "labour", "color": "#f28c28"},
+    "CG": {"name": "Concrete gang", "name_ar": "عمالة صب", "kind": "labour", "color": "#3cb56a"},
+    "GL": {"name": "General labour", "name_ar": "عمالة عامة", "kind": "labour", "color": "#f2d024"},
+    "SV": {"name": "Supervisors & engineers", "name_ar": "مهندسين ومشرفين", "kind": "labour", "color": "#ffffff"},
+    "CRC": {"name": "Crane crew", "name_ar": "طاقم الونش", "kind": "labour", "color": "#e5594f"},
+    "TWC": {"name": "Tower crane", "name_ar": "ونش برجي", "kind": "equipment", "color": null},
+    "PMP": {"name": "Concrete pump", "name_ar": "مضخة خرسانة", "kind": "equipment", "color": null}
+  },
+  "cost": {
+    "currency": "EGP",
+    "rules": [
+      {"where": {"type": "FND", "mark": "PIT"}, "rate": "Reinforced Concrete 300 kg/m3 1500 mm thick raft", "label": "Raft/pit 1500mm",
+       "also": [{"rate": "Plain conc 200kg/cm2 100 mm", "basis": "area_m2"}, {"rate": "4mm thick, Bituminous waterproofing", "basis": "area_m2"}]},
+      {"where": {"type": "FND"}, "rate": "Reinforced Concrete 300 kg/m3 1000mm thick raft", "label": "Raft 1000mm",
+       "also": [{"rate": "Plain conc 200kg/cm2 100 mm", "basis": "area_m2"}, {"rate": "4mm thick, Bituminous waterproofing", "basis": "area_m2"}]},
+      {"where": {"type": "WAL", "mark": "RW"}, "rate": "Reinforced concrete 350 kg/cm2 300mm thick retaining", "label": "Retaining wall 300mm"},
+      {"where": {"type": ["WAL", "CORE"]}, "rate": "Reinforced Concrete 350kg/cm2 for shear and core wall", "label": "Shear & core walls"},
+      {"where": {"type": "COL"}, "rate": "Reinforced Concrete 350kg/cm2 for columns", "label": "Columns"},
+      {"where": {"group": "SLB"}, "rate": {"by": "t_m", "table": {
+         "0.18": "Reinforced Concrete 350kg/cm2 180mm", "0.2": "Reinforced Concrete 350kg/cm2 200mm",
+         "0.22": "Reinforced Concrete 350kg/cm2 220mm", "0.25": "Reinforced Concrete 350kg/cm2 250mm"}},
+       "label": "Flat/solid slab {t_mm} mm"}
+    ],
+    "ac_factors": {"BLN": 1.3, "RRB": 1.6, "RPR": 1.38, "SF": 1.55, "SR": 1.6, "SP": 1.38, "CF": 1.5, "CP": 1.38},
+    "ac_note": "AC = imagined price factors (ASSUMED) — replace with site actual cost in the Cost Report"
+  },
+  "viewer": {
+    "offset": [0, 1.7],
+    "rings_floor": "F01",
+    "pad_days": 3
+  }
+}
