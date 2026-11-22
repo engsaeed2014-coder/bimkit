@@ -26,7 +26,7 @@ function mk(k,note){if(F[k])F[k].remove();const f=document.createElement('iframe
  if(k==='3')f.srcdoc=T3;else{const tp=T4;const d=Object.assign({},saved()||D0);d.mode=k==='5'?'5d':'4d';if(note)d.note=note;const j=JSON.stringify(d).replace(/<\//g,'<\\/');f.srcdoc=tp.replace('__DATA__',()=>j)}
  fr.appendChild(f);F[k]=f;show()}
 function show(){for(const k in F)F[k].style.display=k===cur?'block':'none';['3','4','5'].forEach(k=>$('t_'+k).setAttribute('aria-selected',k===cur))}
-function go(k){cur=k;if(!F[k])mk(k);else show()}
+function go(k){cur=k;for(const o in F)if(o!==k){F[o].remove();delete F[o]}if(!F[k])mk(k);else show()}
 $('t_3').onclick=()=>go('3');$('t_4').onclick=()=>go('4');$('t_5').onclick=()=>go('5');
 function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',6000)}
 addEventListener('message',async e=>{const m=e.data;if(!m||!m.bim)return;
