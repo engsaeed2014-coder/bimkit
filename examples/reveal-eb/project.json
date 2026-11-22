@@ -12,7 +12,7 @@
   "data": "data.json",
   "activities": "activities.json",
   "links": "links.json",
-  "update": null,
+  "update": "REVEAL_EB_Update.xlsx",
   "rates": null,
   "cost_report": null
  },
@@ -98,7 +98,7 @@
    "RAIL": "FIN",
    "STL": "FIN"
   },
-  "source_note": "Approved Master master-v03 (REVEAL-Compound/-REVEAL-Schedule-Control), sheet Master Schedule موحد, Area EB; superseded rows excluded",
+  "source_note": "Baseline = approved Master master-v03 (REVEAL-Compound/-REVEAL-Schedule-Control); update = master-v04, actualized from IR and CPR logs, data date 2026-10-03; sheet Master Schedule موحد, Area EB; superseded rows excluded",
   "steps": {},
   "crane": {
    "enabled": false
