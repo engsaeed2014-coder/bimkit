@@ -26,6 +26,7 @@ pip install openpyxl shapely --break-system-packages
 | `adapters/reveal4d.py` | محوّل REVEAL: موديل reveal-4d + الماستر المعتمد → `data.json` و`activities.json` و`links.json`. |
 | `examples/bicon/` | مثال كامل شغّال (مشروع تدريب) للمقارنة. |
 | `examples/reveal-eb/` | `project.json` لبلوك EB. ملفات البيانات بتتعمل بالمحوّل ومش بتترفع، لأنها من ملفات المشروع السرية. |
+| `examples/reveal-all/` | `project.json` للمشروع كله (WB و EB و NB و SB والمول) ومعاه الموقع العام واللاندسكيب. ملفات البيانات بتتعمل بالمحوّل ومش بتترفع. |
 
 ## التشغيل
 
@@ -60,6 +61,8 @@ python3 schedule.py examples/reveal-eb/project.json out      # inputs.activities
 python3 update.py   examples/reveal-eb/project.json out --data-date 2026-11-22 --assume-baseline-progress
 python3 cost.py     examples/reveal-eb/project.json out      # budget mode: activity
 python3 viewer.py   examples/reveal-eb/project.json out
+# المشروع كله: كذا Area مع بعض، و --site بيضيف الموقع العام (SITE.json) واللاندسكيب (landscape.json، ESTIMATE)
+python3 adapters/reveal4d.py --reveal4d ../reveal-4d --master master.xlsx --area WB EB NB SB Mall --site --out examples/reveal-all
 ```
 
 - `activities.json`: فيه لكل نشاط الكود، والاسم، والدور، والزون، والبداية والنهاية، وكمان `budget` = الكمية، والوحدة، والسعر، والتكلفة، والمصدر.

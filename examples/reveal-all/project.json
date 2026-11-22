@@ -1,0 +1,262 @@
+{
+ "project": {
+  "name": "REVEAL Compound",
+  "name_ar": "ريفيل · المشروع كله (WB · EB · NB · SB · المول)",
+  "subtitle": "REVEAL Residential Compound · Al-Obour · 24 buildings + Mall · Structure + Finishing",
+  "code": "RVL",
+  "short_name": "RVL-ALL",
+  "currency": "EGP",
+  "file_prefix": "REVEAL_ALL"
+ },
+ "inputs": {
+  "data": "data.json",
+  "activities": "activities.json",
+  "links": "links.json",
+  "update": "REVEAL_ALL_Update.xlsx",
+  "rates": null,
+  "cost_report": null
+ },
+ "calendar": {
+  "name": "6-Day Workweek (Sat-Thu)",
+  "off_weekdays": [
+   4
+  ],
+  "holidays": [],
+  "hours_per_day": 8
+ },
+ "schedule": {
+  "start": null,
+  "contract_end": null,
+  "fnd_floor": "FND",
+  "floors": [
+   "SOG",
+   "BM",
+   "GF",
+   "FF",
+   "SF",
+   "TF",
+   "4F",
+   "5F",
+   "RF",
+   "EXT"
+  ],
+  "floor_names_ar": {
+   "FND": "الأساسات",
+   "SOG": "أرضية البدروم",
+   "BM": "البدروم",
+   "GF": "الأرضي",
+   "FF": "الأول",
+   "SF": "الثاني",
+   "TF": "الثالث",
+   "4F": "الرابع",
+   "5F": "الخامس",
+   "RF": "السطح",
+   "EXT": "الموقع العام واللاندسكيب"
+  },
+  "zones": [
+   {
+    "code": "EB1",
+    "name": "Building EB1",
+    "name_ar": "عمارة EB1"
+   },
+   {
+    "code": "EB2",
+    "name": "Building EB2",
+    "name_ar": "عمارة EB2"
+   },
+   {
+    "code": "EB3",
+    "name": "Building EB3",
+    "name_ar": "عمارة EB3"
+   },
+   {
+    "code": "EB4",
+    "name": "Building EB4",
+    "name_ar": "عمارة EB4"
+   },
+   {
+    "code": "EB5",
+    "name": "Building EB5",
+    "name_ar": "عمارة EB5"
+   },
+   {
+    "code": "EB6",
+    "name": "Building EB6",
+    "name_ar": "عمارة EB6"
+   },
+   {
+    "code": "NB1",
+    "name": "Building NB1",
+    "name_ar": "عمارة NB1"
+   },
+   {
+    "code": "NB2",
+    "name": "Building NB2",
+    "name_ar": "عمارة NB2"
+   },
+   {
+    "code": "NB3",
+    "name": "Building NB3",
+    "name_ar": "عمارة NB3"
+   },
+   {
+    "code": "NB4",
+    "name": "Building NB4",
+    "name_ar": "عمارة NB4"
+   },
+   {
+    "code": "NB5",
+    "name": "Building NB5",
+    "name_ar": "عمارة NB5"
+   },
+   {
+    "code": "NB6",
+    "name": "Building NB6",
+    "name_ar": "عمارة NB6"
+   },
+   {
+    "code": "SB1",
+    "name": "Building SB1",
+    "name_ar": "عمارة SB1"
+   },
+   {
+    "code": "SB2",
+    "name": "Building SB2",
+    "name_ar": "عمارة SB2"
+   },
+   {
+    "code": "SB3",
+    "name": "Building SB3",
+    "name_ar": "عمارة SB3"
+   },
+   {
+    "code": "SB4",
+    "name": "Building SB4",
+    "name_ar": "عمارة SB4"
+   },
+   {
+    "code": "SB5",
+    "name": "Building SB5",
+    "name_ar": "عمارة SB5"
+   },
+   {
+    "code": "SB6",
+    "name": "Building SB6",
+    "name_ar": "عمارة SB6"
+   },
+   {
+    "code": "WB1",
+    "name": "Building WB1",
+    "name_ar": "عمارة WB1"
+   },
+   {
+    "code": "WB2",
+    "name": "Building WB2",
+    "name_ar": "عمارة WB2"
+   },
+   {
+    "code": "WB3",
+    "name": "Building WB3",
+    "name_ar": "عمارة WB3"
+   },
+   {
+    "code": "WB4",
+    "name": "Building WB4",
+    "name_ar": "عمارة WB4"
+   },
+   {
+    "code": "WB5",
+    "name": "Building WB5",
+    "name_ar": "عمارة WB5"
+   },
+   {
+    "code": "WB6",
+    "name": "Building WB6",
+    "name_ar": "عمارة WB6"
+   },
+   {
+    "code": "P1",
+    "name": "Mall part P1",
+    "name_ar": "المول جزء P1"
+   },
+   {
+    "code": "P2",
+    "name": "Mall part P2",
+    "name_ar": "المول جزء P2"
+   },
+   {
+    "code": "P3",
+    "name": "Mall part P3",
+    "name_ar": "المول جزء P3"
+   },
+   {
+    "code": "P4",
+    "name": "Mall part P4",
+    "name_ar": "المول جزء P4"
+   },
+   {
+    "code": "P5",
+    "name": "Mall part P5",
+    "name_ar": "المول جزء P5"
+   },
+   {
+    "code": "P6",
+    "name": "Mall part P6",
+    "name_ar": "المول جزء P6"
+   },
+   {
+    "code": "P7",
+    "name": "Mall part P7",
+    "name_ar": "المول جزء P7"
+   },
+   {
+    "code": "P8",
+    "name": "Mall part P8",
+    "name_ar": "المول جزء P8"
+   }
+  ],
+  "groups": {
+   "FND": "FND",
+   "TIE": "FND",
+   "SLB": "SLB",
+   "BEAM": "SLB",
+   "STR": "SLB",
+   "COL": "VERT",
+   "WAL": "VERT",
+   "BLK": "FIN",
+   "FAC": "FIN",
+   "FAC2": "FIN",
+   "WIN": "FIN",
+   "RAIL": "FIN",
+   "STL": "FIN",
+   "ROAD": "FIN",
+   "PAVE": "FIN",
+   "CURB": "FIN",
+   "PLANT": "FIN",
+   "POOL": "FIN",
+   "LAWN": "FIN",
+   "HEDGE": "FIN",
+   "TRUNK": "FIN",
+   "TREE": "FIN"
+  },
+  "source_note": "Baseline = approved Master master-v03 (REVEAL-Compound/-REVEAL-Schedule-Control); update = master-v04, actualized from IR and CPR logs, data date 2026-10-03; sheet Master Schedule موحد, Areas WB, EB, NB, SB, Mall; superseded rows excluded",
+  "steps": {},
+  "crane": {
+   "enabled": false
+  }
+ },
+ "resources": {},
+ "cost": {
+  "currency": "EGP",
+  "rules": [],
+  "budget_note": "Budget = approved Master master-v03 cost loading per activity (Qty x Budget Rate from the block and Mall BOQs and the Residential Finishing BOQ; BOQ rates include the 25% margin) — chosen by Saeed"
+ },
+ "viewer": {
+  "offset": [
+   0,
+   0
+  ],
+  "rings_floor": "GF",
+  "pad_days": 3
+ }
+}

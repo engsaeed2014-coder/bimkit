@@ -105,7 +105,7 @@ def main():
         if C.get("mode") == "activity":
             linked = {t for l in L.values() for t in l["tasks"]}
             s_lk = sum(v["bc"] for k, v in C["activities"].items() if k in linked)
-            if abs(s_act - bac) < 1 and abs(s_el - s_lk) < 1:
+            if abs(s_act - bac) < 1 and abs(s_el - s_lk) < max(1, 1e-8 * s_lk):   # weights are rounded to 0.01
                 ok(f"activity budget = BAC {bac:,.2f}; elements carry their activities' budget {s_el:,.2f}")
             else:
                 fails.append(f"budget mismatch: activities {s_act:,.2f} BAC {bac:,.2f} elements {s_el:,.2f} linked {s_lk:,.2f}")

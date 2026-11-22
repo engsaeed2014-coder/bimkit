@@ -102,11 +102,11 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 const D=JSON.parse(document.getElementById('bim-data').textContent);
 const EL=D.elements, LV=D.levels;
-const C=D.cfg,FL=C.floors,BB=C.bbox,CXX=(BB[0]+BB[1])/2,CZZ=(BB[2]+BB[3])/2,SPN=Math.max(1,(BB[1]-BB[0])/61.3,(BB[3]-BB[2])/22),TOPF=FL[FL.length-1];
+const C=D.cfg,FL=C.floors,BB=C.bbox,CXX=(BB[0]+BB[1])/2,CZZ=(BB[2]+BB[3])/2,SPN=Math.max(1,(BB[1]-BB[0])/61.3,(BB[3]-BB[2])/60),TOPF=FL[FL.length-1];
 document.getElementById('h1t').textContent=C.name;document.getElementById('h1p').textContent=(C.subtitle?C.subtitle+' · ':'')+'3D model';
 {const s=document.getElementById('sec');s.min=Math.floor(BB[0]-5);s.max=Math.ceil(BB[1]+5);s.value=Math.round(CXX);const c=document.getElementById('cut');c.min=Math.floor(D.levels.FND-1);c.max=Math.ceil(Math.max(...Object.values(D.levels))+4);c.value=c.max}
-const TYN={COL:'Columns',WAL:'Walls',SLB:'Slabs',FND:'Foundation',BEAM:'Beams',CORE:'Cores',STR:'Stairs',RAMP:'Ramps',BLK:'Block work',FAC:'Facade (RAL 9010)',FAC2:'Facade (RAL 7035)',WIN:'Windows',RAIL:'Railings',STL:'Steel boxes',TIE:'Tie beams',SOIL:'Earthworks (ASSUMED layer)'},TY={};['FND','SLB','BEAM','COL','WAL','CORE','STR','RAMP'].forEach(t=>{if(EL.some(e=>e.type===t))TY[t]=TYN[t]});EL.forEach(e=>{if(!TY[e.type])TY[e.type]=TYN[e.type]||e.type});
-const TC0={COL:0xd9825b,WAL:0xcdb892,SLB:0x8fa9bd,FND:0x7f9480,BEAM:0xb59cd0,CORE:0xc9a27a,STR:0xd8c46a,RAMP:0x9ec7b0,BLK:0xc8663b,FAC:0xe4e0d4,FAC2:0xb9bcbe,WIN:0x6fa8d6,RAIL:0x8a9097,STL:0x6d7378,TIE:0x9aa39a,SOIL:0x9b7b55},TC=new Proxy(TC0,{get:(o,k)=>o[k]!==undefined?o[k]:0xaaaaaa});
+const TYN={COL:'Columns',WAL:'Walls',SLB:'Slabs',FND:'Foundation',BEAM:'Beams',CORE:'Cores',STR:'Stairs',RAMP:'Ramps',BLK:'Block work',FAC:'Facade (RAL 9010)',FAC2:'Facade (RAL 7035)',WIN:'Windows',RAIL:'Railings',STL:'Steel boxes',TIE:'Tie beams',SOIL:'Earthworks (ASSUMED layer)',ROAD:'Roads',PAVE:'Paving',CURB:'Kerbs',PLANT:'Planters',POOL:'Pools',LAWN:'Lawn (ESTIMATE)',HEDGE:'Hedges (ESTIMATE)',TRUNK:'Tree trunks (ESTIMATE)',TREE:'Trees (ESTIMATE)'},TY={};['FND','SLB','BEAM','COL','WAL','CORE','STR','RAMP'].forEach(t=>{if(EL.some(e=>e.type===t))TY[t]=TYN[t]});EL.forEach(e=>{if(!TY[e.type])TY[e.type]=TYN[e.type]||e.type});
+const TC0={COL:0xd9825b,WAL:0xcdb892,SLB:0x8fa9bd,FND:0x7f9480,BEAM:0xb59cd0,CORE:0xc9a27a,STR:0xd8c46a,RAMP:0x9ec7b0,BLK:0xc8663b,FAC:0xe4e0d4,FAC2:0xb9bcbe,WIN:0x6fa8d6,RAIL:0x8a9097,STL:0x6d7378,TIE:0x9aa39a,SOIL:0x9b7b55,ROAD:0x4a4d52,PAVE:0xc9b79c,CURB:0xd9d9d6,PLANT:0x6f9a4a,POOL:0x4fb3d9,LAWN:0x7fb35a,HEDGE:0x3f7d3a,TRUNK:0x7a5a3a,TREE:0x3e8a45},TC=new Proxy(TC0,{get:(o,k)=>o[k]!==undefined?o[k]:0xaaaaaa});
 const CC={READ:0x5fb98a,CALC:0xe8a33d,ASSUMED:0xe5665f};
 const FC=f=>new THREE.Color().setHSL(0.58-0.52*FL.indexOf(f)/(FL.length-1),0.45,0.58);
 const $=s=>document.querySelector(s);
@@ -288,7 +288,7 @@ function setTime(h){tod=h;const a=(h-6)/12*Math.PI,el=Math.sin(a),d=Math.max(0,M
  $('#clk').textContent=String(Math.floor(h)).padStart(2,'0')+':'+String(Math.round((h%1)*60)).padStart(2,'0').replace('60','59')}
 $('#tod').oninput=ev=>setTime(+ev.target.value);
 $('#dayb').onclick=()=>{$('#tod').value=13;setTime(13)};$('#nightb').onclick=()=>{$('#tod').value=22;setTime(22)};
-$('#siteb').onclick=ev=>{site.visible=!site.visible;ev.target.classList.toggle('on',site.visible)};
+$('#siteb').onclick=ev=>{site.visible=!site.visible;ev.target.classList.toggle('on',site.visible)};if(SPN>2.5){site.visible=false;trafficOn=false;$('#siteb').classList.remove('on');$('#trafb').classList.remove('on')}  /* large sites: the generic street scene does not fit, off by default */
 $('#trafb').onclick=ev=>{trafficOn=!trafficOn;ev.target.classList.toggle('on',trafficOn)};
 let lastT=0;function traffic(t){const dt=Math.min(.1,(t-lastT)/1000||0);lastT=t;if(!trafficOn||!site.visible)return;cars.forEach(c=>{c.x+=c.v*dt;if(c.x>190)c.x=-150;if(c.x<-150)c.x=190;c.g.position.x=c.x})}
 

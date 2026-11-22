@@ -20,10 +20,14 @@ from collections import defaultdict
 TYPE = {"Column": "COL", "Beam": "BEAM", "Slab": "SLB", "Footing": "FND", "Stair": "STR", "BlockWall": "BLK",
         "FacadeRAL9010": "FAC", "FacadeRAL7035": "FAC2", "Window": "WIN", "WindowFrame": "WIN", "Railing": "RAIL",
         "TopRail": "RAIL", "SteelBox": "STL", "Wall": "WAL", "RetWall": "WAL", "Drop": "SLB",
-        "BlockWall12": "BLK", "BlockWall25": "BLK", "RetainingWall": "WAL", "SoilLayer": "SOIL"}
+        "BlockWall12": "BLK", "BlockWall25": "BLK", "RetainingWall": "WAL", "SoilLayer": "SOIL",
+        "Road": "ROAD", "Paving": "PAVE", "Curb": "CURB", "Planter": "PLANT", "Pool": "POOL",
+        "Lawn": "LAWN", "Hedge": "HEDGE", "TreeTrunk": "TRUNK", "TreeCanopy": "TREE",
+        "ACPLight": "FAC", "ACPDark": "FAC2", "CurtainWall": "WIN", "Shopfront": "WIN", "Coping": "FAC2"}
+FLOOR_ALIAS = {"B1": "BM", "TR": "RF"}   # Mall basement / roof top-room shown on the block floor list
 LEVEL_MAP = {"FND": "FND", "SOG": "SOG", "BM": "BM", "GF": "GF", "01": "FF", "02": "SF", "03": "TF", "04": "4F",
              "05": "5F", "RF": "RF"}
-FLOORS = ["FND", "SOG", "BM", "GF", "FF", "SF", "TF", "4F", "5F", "RF"]
+FLOORS = ["FND", "SOG", "BM", "GF", "FF", "SF", "TF", "4F", "5F", "RF", "EXT"]
 
 
 def area(pts):
@@ -46,7 +50,7 @@ def load_master(path, sheet, area_code):
         if not r or not r[0]:
             continue
         x = dict(zip(H, r))
-        if x.get("Area") != area_code:
+        if x.get("Area") not in area_code:
             continue
         if x.get("Package") == "Superseded" or not x.get("Start") or not x.get("Finish"):
             skipped += 1
@@ -78,13 +82,50 @@ def _poly_pieces(geom):
     return out
 
 
+def add_site(groups, root):
+    """Site works as drawn (SITE.json: roads, paving, kerbs, planters, pools) + soft landscape (landscape.json, ESTIMATE:
+    no planting plan issued). The Master has no site activities, so main() links them to its last activity."""
+    import math
+    f = os.path.join(root, "data", "geometry", "SITE.json")
+    if not os.path.exists(f):
+        return False
+    for e in json.load(open(f, encoding="utf-8"))["elements"]:
+        if e["cat"] in TYPE and len(e.get("p", [])) >= 3 and e["z1"] - e["z0"] >= 0.01:
+            groups[("SITE", "EXT", e["cat"], None, "SITE")].append(e)
+    f = os.path.join(root, "data", "landscape.json")
+    if os.path.exists(f):
+        L = json.load(open(f, encoding="utf-8"))
+        for cat, key, h in (("Lawn", "lawn", 0.08), ("Hedge", "hedge", 1.0)):
+            for a in L.get(key, []):
+                if len(a["p"]) >= 3:
+                    groups[("SITE", "EXT", cat, None, "SITE")].append(
+                        dict(p=a["p"], h=a.get("h", []), z0=a["z"], z1=a["z"] + h, est="landscape ESTIMATE"))
+        ring = lambda x, y, r, n: [[x + r * math.cos(2 * math.pi * i / n), y + r * math.sin(2 * math.pi * i / n)] for i in range(n)]
+        RAD = {"palm": 1.7, "broad": 2.6, "cypress": 0.8}
+        for x, y, z, kind, h in L.get("trees", []):
+            groups[("SITE", "EXT", "TreeTrunk", None, "SITE")].append(
+                dict(p=ring(x, y, 0.16, 6), z0=z, z1=z + h * (0.82 if kind == "palm" else 0.55), est="landscape ESTIMATE"))
+            r = RAD.get(kind, 2)
+            # canopy as stacked tiers so it reads as a crown, not a drum: (bottom, top, radius factor) of the height
+            tiers = {"palm": [(0.80, 0.88, 1.0), (0.88, 0.95, 0.7), (0.95, 1.0, 0.35)],
+                     "cypress": [(0.20, 0.45, 1.0), (0.45, 0.70, 0.8), (0.70, 0.88, 0.55), (0.88, 1.0, 0.25)]
+                     }.get(kind, [(0.50, 0.62, 0.7), (0.62, 0.82, 1.0), (0.82, 0.93, 0.75), (0.93, 1.0, 0.4)])
+            for b0, b1, k in tiers:
+                groups[("SITE", "EXT", "TreeCanopy", None, "SITE")].append(
+                    dict(p=ring(x, y, r * k, 10), z0=z + h * b0, z1=z + h * b1, est="landscape ESTIMATE"))
+    return True
+
+
 def add_assumed(groups, files):
+    for f in files:
+        if f.endswith("SUB"):
+            _add_assumed(groups, f)
+
+
+def _add_assumed(groups, sub):
     """ASSUMED geometry for scope the drawings do not carry: basement retaining wall + soil layer under footings."""
     from shapely.geometry import MultiPoint, Polygon
     from shapely.ops import unary_union
-    sub = next((f for f in files if f.endswith("SUB")), None)
-    if not sub:
-        return
     bm = [(k, e) for k, es in groups.items() if k[0] == sub and k[1] == "BM" and k[2] == "Slab" for e in es]
     sog = [e for k, es in groups.items() if k[0] == sub and k[1] == "SOG" and k[2] == "Slab" for e in es]
     if bm:
@@ -141,25 +182,31 @@ def apply_stages(rules, meta, links, acts):
     A = {x["code"]: x for x in acts}
     out = {}
     for eid, m in meta.items():
-        tasks = list(links.get(eid, []))
+        base = list(links.get(eid, []))
+        tasks = list(base)
+        part = A[base[0]]["zone"] if base and base[0] in A and A[base[0]]["zone"] != A[base[0]].get("group") else m["part"]
         for r in rules:
             if r["cat"] != m["cat"] or (r.get("lv") and r["lv"] != m["lv"]):
                 continue
+            if r.get("only") and not str(part).startswith(r["only"]):
+                continue
             if r.get("replace"):
                 tasks = []
-            lv = r.get("floor_as") or m["lv"]
+            lv = r.get("floor_as") or FLOOR_ALIAS.get(m["lv"], m["lv"])
             for nm in r["names"]:
-                g_ = grp_of.get(m["part"])
+                g_ = grp_of.get(part)
                 if r["floor"] == "same":       # building activity first, else the group's activity on that floor
-                    tasks += _find(by_floor, (m["part"], lv), nm) or _find(by_floor, (g_, lv), nm)
+                    tasks += _find(by_floor, (part, lv), nm) or _find(by_floor, (g_, lv), nm)
                 elif r["floor"] == "below":
                     i = FLOORS.index(lv) if lv in FLOORS else -1
                     if 0 <= i < len(FLOORS) - 1:
-                        tasks += _find(by_floor, (m["part"], FLOORS[i + 1]), nm) or _find(by_floor, (g_, FLOORS[i + 1]), nm)
+                        tasks += _find(by_floor, (part, FLOORS[i + 1]), nm) or _find(by_floor, (g_, FLOORS[i + 1]), nm)
                 elif r["floor"] == "building":
-                    tasks += _find(by_bld, (m["part"],), nm) or _find(by_grp, (g_,), nm)
+                    tasks += _find(by_bld, (part,), nm) or _find(by_grp, (g_,), nm)
                 elif r["floor"] == "group":
-                    tasks += _find(by_grp, (grp_of.get(m["part"]),), nm)
+                    tasks += _find(by_grp, (grp_of.get(part),), nm)
+        if not any(c in A for c in tasks):
+            tasks = base                    # rules found nothing (e.g. Mall): keep the reveal-4d mapping
         seen = []
         for c in tasks:
             if c in A and c not in seen:
@@ -182,10 +229,11 @@ def main():
     ap.add_argument("--reveal4d", required=True)
     ap.add_argument("--master", required=True)
     ap.add_argument("--sheet", default="Master Schedule موحد")
-    ap.add_argument("--area", default="EB")
+    ap.add_argument("--area", nargs="+", default=["EB"], help="one or more master Area codes (EB WB NB SB Mall)")
     ap.add_argument("--files", nargs="*")
     ap.add_argument("--out", required=True)
     ap.add_argument("--name", default=None)
+    ap.add_argument("--site", action="store_true", help="add site works (SITE.json) and soft landscape (landscape.json)")
     ap.add_argument("--stages", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "reveal_stages.json"),
                     help="extra activities per element (finishing stages); '' to use the reveal-4d mapping only")
     a = ap.parse_args()
@@ -193,7 +241,11 @@ def main():
         from shapely.geometry import MultiPoint
     except ImportError:
         sys.exit("pip install shapely --break-system-packages")
-    files = a.files or [f"{a.area}-SUB", f"{a.area}123", f"{a.area}456"]
+    G = os.path.join(a.reveal4d, "data", "geometry")
+    FILES = {"Mall": ["MALL"]}
+    files = a.files or [os.path.splitext(n)[0] for ar in a.area for n in sorted(os.listdir(G))
+                        if n.endswith(".json") and (n[:-5] in FILES.get(ar, []) or
+                                                    (ar not in FILES and n.startswith(ar)))]
     G = os.path.join(a.reveal4d, "data", "geometry")
     mapping = json.load(open(os.path.join(a.reveal4d, "data", "mapping.json"), encoding="utf-8"))
 
@@ -205,6 +257,7 @@ def main():
     for f in files:
         g = json.load(open(os.path.join(G, f + ".json"), encoding="utf-8"))
         for lv, L in g.get("levels", {}).items():
+            lv = FLOOR_ALIAS.get(lv, lv)
             levels[lv] = min(levels.get(lv, 1e9), L["z"])
             tops[lv] = max(tops.get(lv, -1e9), L["z"] + L.get("h", 0))
         for e in g["elements"]:
@@ -222,6 +275,10 @@ def main():
 
     if ST.get("assumed_geometry"):
         add_assumed(groups, files)
+
+    site = a.site and add_site(groups, a.reveal4d)
+    if site:
+        levels["EXT"], tops["EXT"] = 0, 0.3
 
     allx = [p[0] for es in groups.values() for e in es for p in e["p"]]
     ally = [p[1] for es in groups.values() for e in es for p in e["p"]]
@@ -242,14 +299,16 @@ def main():
             h = max(e["z1"] - e["z0"], 0)
             vol += a_ * h
             ar += a_
-            parts.append(dict(outer=pts, holes=[], z0=R(e["z0"]), z1=R(e["z1"])))
+            hs = [[[R(x - ox), R(y - oy)] for x, y in hh] for hh in e.get("h", []) if len(hh) >= 3]
+            a_ -= sum(area(hh) for hh in hs)
+            parts.append(dict(outer=pts, holes=hs, z0=R(e["z0"]), z1=R(e["z1"])))
             pts_all += pts
             est = est or bool(e.get("est"))
         hull = MultiPoint(pts_all).convex_hull
         outer = [[R(x), R(y)] for x, y in hull.exterior.coords] if hull.geom_type == "Polygon" else parts[0]["outer"]
         cx, cy = hull.centroid.x, hull.centroid.y
         eid = f"{part}-{lv}-{cat}"
-        elements.append(dict(id=eid, floor=lv, type=typ, mark=cat, axis=part, x=R(cx), y=R(cy),
+        elements.append(dict(id=eid, floor=FLOOR_ALIAS.get(lv, lv), type=typ, mark=cat, axis=part, x=R(cx), y=R(cy),
                              z0=min(p["z0"] for p in parts), z1=max(p["z1"] for p in parts),
                              dims=dict(area_m2=round(ar, 3), pieces=len(parts)), volume_m3=round(vol, 3),
                              source_sheet=f"reveal-4d/{f}" if f != "ASSUMED" else "ASSUMED geometry (adapter)",
@@ -262,26 +321,36 @@ def main():
         if act:
             links[eid] = [act]
 
-    acts, skipped = load_master(a.master, a.sheet, a.area)
+    acts, skipped = load_master(a.master, a.sheet, set(a.area))
     codes = {x["code"] for x in acts}
     links = apply_stages(ST.get("rules", []), meta, links, acts)
-    for eid in meta:
-        if eid not in links:
-            orphans.append(eid)
+    if site:   # TEMPORARY: no site activities in the Master -> shown from its last activity (as reveal-4d does)
+        last = max(acts, key=lambda x: (x["finish"], x["code"]))["code"]
+        for eid, m in meta.items():
+            if m["part"] == "SITE":
+                links[eid] = dict(tasks=[last])
+        print(f"site works + landscape linked to the last Master activity {last} (TEMPORARY, no site activities in the Master)")
+    drop = {e["id"] for e in elements if e["confidence"] == "ASSUMED" and e["id"] not in links}
+    if drop:   # ASSUMED geometry with no Master activity (e.g. WB earthworks not in the Master): leave it out
+        elements = [e for e in elements if e["id"] not in drop]
+        print(f"ASSUMED elements left out (no Master activity): {len(drop)}")
+    for e in elements:
+        if e["id"] not in links:
+            orphans.append(e["id"])
     bad = sorted({c for v in links.values() for c in v["tasks"] if c not in codes})
     floors = [f for f in FLOORS if f in levels or any(e["floor"] == f for e in elements)]
     xs = [p[0] for e in elements for p in e["geom"]["outer"]]
     ys = [p[1] for e in elements for p in e["geom"]["outer"]]
     data = dict(levels={f: levels.get(f, 0) for f in floors}, top={f: tops.get(f, 0) for f in floors},
                 grid=dict(x=[], xl=[], y=[], yl=[]), elements=elements,
-                cfg=dict(name=a.name or f"REVEAL {a.area}", subtitle="REVEAL Residential Compound · Al-Obour",
+                cfg=dict(name=a.name or ("REVEAL " + " ".join(a.area)), subtitle="REVEAL Residential Compound · Al-Obour",
                          floors=floors, bbox=[min(xs), max(xs), min(ys), max(ys)],
                          qa=dict(origin_shift=[ox, oy], source="reveal-4d " + " ".join(files),
                                  unmapped_elements=orphans, zero_height_pieces_dropped=len(dropped),
                                  assumed_geometry=ST.get("assumed_geometry", {}))))
     os.makedirs(a.out, exist_ok=True)
     json.dump(data, open(os.path.join(a.out, "data.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
-    json.dump(dict(source=os.path.basename(a.master), area=a.area, activities=acts),
+    json.dump(dict(source=os.path.basename(a.master), area=" ".join(a.area), activities=acts),
               open(os.path.join(a.out, "activities.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=0)
     json.dump(links, open(os.path.join(a.out, "links.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=0)
     bud = sum((x["budget"] or {}).get("cost", 0) for x in acts)

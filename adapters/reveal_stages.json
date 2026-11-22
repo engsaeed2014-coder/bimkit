@@ -1,5 +1,5 @@
 {
- "_note": "Which Master activities each model element carries, in addition to (or instead of) the reveal-4d mapping. Activity names are matched on the text after the last ' · ' (endswith). floor: same = activity on the element's floor; below = activity on the floor above the element (floor finishes sit on the slab under them); building = building-level activity (no floor); group = group-level activity (EB-A / EB-B). Weights = activity budget share on the element.",
+ "_note": "Which Master activities each model element carries, in addition to (or instead of) the reveal-4d mapping. Activity names are matched on the text after the last ' · ' (endswith). floor: same = activity on the element's floor; below = activity on the floor above the element (floor finishes sit on the slab under them); building = building-level activity (no floor); group = group-level activity (EB-A / EB-B). Weights = activity budget share on the element. only = rule applies when the element's activity zone starts with this text (e.g. Mall).",
  "split": {
   "BlockWall": {
    "by": "w",
@@ -15,6 +15,7 @@
    "floor": "same",
    "names": [
     "Block Work - 12cm",
+    "Block Work",
     "Beacons",
     "Electrical Prep",
     "بياض داخلي للوحدات",
@@ -29,6 +30,7 @@
    "floor": "same",
    "names": [
     "Block Work - 25cm",
+    "Block Work",
     "Beacons",
     "Electrical Prep",
     "بياض داخلي للوحدات",
@@ -205,7 +207,9 @@
     "Soil Replacement - 1:1:2",
     "Plain Concrete (PCC)",
     "Backfill - Sand Supplied From Inside Site",
-    "Backfill - Sand Supplied From Outside Site"
+    "Backfill - Sand Supplied From Outside Site",
+    "Excavation",
+    "Soil Replacement - 6 Layers"
    ]
   },
   {
@@ -241,6 +245,37 @@
    "floor": "same",
    "names": [
     "RF Block Work - 12cm"
+   ]
+  },
+  {
+   "cat": "Slab",
+   "lv": "B1",
+   "only": "Mall",
+   "floor": "same",
+   "names": [
+    "Internal Backfill",
+    "SOG"
+   ]
+  },
+  {
+   "cat": "RetWall",
+   "lv": "B1",
+   "only": "Mall",
+   "floor": "same",
+   "names": [
+    "Retaining Wall",
+    "Waterproofing",
+    "External Backfill"
+   ]
+  },
+  {
+   "cat": "Footing",
+   "only": "Mall",
+   "floor": "group",
+   "names": [
+    "Excavation",
+    "Soil Replacement - 6 Layers",
+    "Plain Concrete (PCC)"
    ]
   }
  ],
