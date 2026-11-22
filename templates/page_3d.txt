@@ -99,14 +99,14 @@ ul.q{margin:4px 0 0;padding-left:18px}ul.q li{margin:3px 0}
 <script type="application/json" id="bim-data">@@BIMDATA@@<\/script>
 <script type="module">
 import * as THREE from 'three';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 const D=JSON.parse(document.getElementById('bim-data').textContent);
 const EL=D.elements, LV=D.levels;
 const C=D.cfg,FL=C.floors,BB=C.bbox,CXX=(BB[0]+BB[1])/2,CZZ=(BB[2]+BB[3])/2,SPN=Math.max(1,(BB[1]-BB[0])/61.3,(BB[3]-BB[2])/22),TOPF=FL[FL.length-1];
 document.getElementById('h1t').textContent=C.name;document.getElementById('h1p').textContent=(C.subtitle?C.subtitle+' · ':'')+'3D model';
 {const s=document.getElementById('sec');s.min=Math.floor(BB[0]-5);s.max=Math.ceil(BB[1]+5);s.value=Math.round(CXX);const c=document.getElementById('cut');c.min=Math.floor(D.levels.FND-1);c.max=Math.ceil(Math.max(...Object.values(D.levels))+4);c.value=c.max}
-const TYN={COL:'Columns',WAL:'Walls',SLB:'Slabs',FND:'Foundation',BEAM:'Beams',CORE:'Cores',STR:'Stairs',RAMP:'Ramps'},TY={};['FND','SLB','BEAM','COL','WAL','CORE','STR','RAMP'].forEach(t=>{if(EL.some(e=>e.type===t))TY[t]=TYN[t]});EL.forEach(e=>{if(!TY[e.type])TY[e.type]=e.type});
-const TC0={COL:0xd9825b,WAL:0xcdb892,SLB:0x8fa9bd,FND:0x7f9480,BEAM:0xb59cd0,CORE:0xc9a27a,STR:0xd8c46a,RAMP:0x9ec7b0},TC=new Proxy(TC0,{get:(o,k)=>o[k]!==undefined?o[k]:0xaaaaaa});
+const TYN={COL:'Columns',WAL:'Walls',SLB:'Slabs',FND:'Foundation',BEAM:'Beams',CORE:'Cores',STR:'Stairs',RAMP:'Ramps',BLK:'Block work',FAC:'Facade (RAL 9010)',FAC2:'Facade (RAL 7035)',WIN:'Windows',RAIL:'Railings',STL:'Steel boxes',TIE:'Tie beams'},TY={};['FND','SLB','BEAM','COL','WAL','CORE','STR','RAMP'].forEach(t=>{if(EL.some(e=>e.type===t))TY[t]=TYN[t]});EL.forEach(e=>{if(!TY[e.type])TY[e.type]=TYN[e.type]||e.type});
+const TC0={COL:0xd9825b,WAL:0xcdb892,SLB:0x8fa9bd,FND:0x7f9480,BEAM:0xb59cd0,CORE:0xc9a27a,STR:0xd8c46a,RAMP:0x9ec7b0,BLK:0xc8663b,FAC:0xe4e0d4,FAC2:0xb9bcbe,WIN:0x6fa8d6,RAIL:0x8a9097,STL:0x6d7378,TIE:0x9aa39a},TC=new Proxy(TC0,{get:(o,k)=>o[k]!==undefined?o[k]:0xaaaaaa});
 const CC={READ:0x5fb98a,CALC:0xe8a33d,ASSUMED:0xe5665f};
 const FC=f=>new THREE.Color().setHSL(0.58-0.52*FL.indexOf(f)/(FL.length-1),0.45,0.58);
 const $=s=>document.querySelector(s);
@@ -134,11 +134,11 @@ FL.forEach(f=>{const g=new THREE.Group();g.userData.f=f;groups[f]=g;scene.add(g)
 const edgeMat=new THREE.LineBasicMaterial({color:0x20262b,transparent:true,opacity:.55});
 EL.forEach(e=>{
  const h=Math.max(e.z1-e.z0,0.02);
- const geo=new THREE.ExtrudeGeometry(shapeOf(e.geom),{depth:h,bevelEnabled:false});
- geo.rotateX(-Math.PI/2);geo.translate(0,e.z0,0);
+ const one=(g,z0,z1)=>{const q=new THREE.ExtrudeGeometry(shapeOf(g),{depth:Math.max(z1-z0,0.02),bevelEnabled:false});q.rotateX(-Math.PI/2);q.translate(0,z0,0);return q.index?q.toNonIndexed():q};
+ let geo;if(e.geom.parts&&e.geom.parts.length){const gs=e.geom.parts.map(pp=>one({outer:pp.outer,holes:pp.holes||[]},pp.z0,pp.z1));geo=mergeGeometries(gs,false);gs.forEach(x=>x.dispose())}else geo=one(e.geom,e.z0,e.z0+h);
  const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({...matBase,color:0xbdbdb8,clippingPlanes:[]}));
  m.castShadow=true;m.receiveShadow=true;m.userData.e=e;
- const ed=new THREE.LineSegments(new THREE.EdgesGeometry(geo,35),edgeMat.clone());ed.material.clippingPlanes=[];m.add(ed);m.userData.ed=ed;
+ const ed=new THREE.LineSegments((e.geom.parts&&e.geom.parts.length>400)?new THREE.BufferGeometry():new THREE.EdgesGeometry(geo,35),edgeMat.clone());ed.material.clippingPlanes=[];m.add(ed);m.userData.ed=ed;
  groups[e.floor].add(m);meshes.push(m);e._m=m;
 });
 // grid + labels

@@ -155,7 +155,7 @@ def write_programme(P, acts, cal, links, data, path, feed=None):
     ws["A1"] = f"{P['project']['name']} - Structural Works: Baseline vs Actual / Forecast programme"
     ws["A1"].font = st["title"]
     ws["A2"] = "Data date"
-    ws["B2"] = dd or d(S["start"])
+    ws["B2"] = dd or min(d(a["baseline_start"]) for a in acts)
     ws["B2"].number_format = DATE_FMT
     ws["B2"].fill, ws["B2"].font = st["input_fill"], st["input_font"]
     ws["C2"] = (f"Calendar: {cal.name}. Blue bar = baseline. Green = actual. Orange = forecast. "
@@ -163,7 +163,7 @@ def write_programme(P, acts, cal, links, data, path, feed=None):
     hd = ["Code", "Activity", "النشاط", "WBS", "Row", "Start", "Finish", "Dur (wd)", "Status", "% complete",
           "Var finish (days)", "Total float (wd)", "Critical", "Predecessors", "Labour on activity", ""]
     head_row(ws, 4, hd, st, [8, 44, 44, 7, 8, 11, 11, 8, 11, 9, 9, 9, 7, 22, 9, 2])
-    start = d(S["start"])
+    start = min(d(a["baseline_start"]) for a in acts)
     wk0 = start - dt.timedelta(days=(start.weekday() + 1) % 7)       # week starts Sunday
     ends = [d(a["baseline_finish"]) for a in acts] + [d(F[c]["upd_finish"]) for c in F if F[c].get("upd_finish")]
     endd = max(ends)
@@ -195,7 +195,7 @@ def write_programme(P, acts, cal, links, data, path, feed=None):
             r += 1
         lab = sum(v for k, v in a["crew"].items() if k in tr)
         base = [a["code"], a["name"], a["name_ar"], a["wbs"], "Baseline", d(a["baseline_start"]), d(a["baseline_finish"]),
-                a["dur"], None, None, None, a["tf"], "Y" if a["tf"] <= 0 else None,
+                a["dur"], None, None, None, a["tf"], "Y" if a["tf"] is not None and a["tf"] <= 0 else None,
                 ", ".join(p["task"] + ("" if p.get("type", "FS") == "FS" and not p.get("lag") else
                                        f" {p.get('type', 'FS')}{'+' + str(p['lag']) if p.get('lag') else ''}") for p in a["preds"]),
                 round(lab, 1)]
@@ -306,7 +306,7 @@ def write_programme(P, acts, cal, links, data, path, feed=None):
         if a["step"]:
             durs.setdefault(a["step"], a["dur"])
     r = 5
-    for k, s in S["steps"].items():
+    for k, s in S.get("steps", {}).items():
         row = [k, s["name"], s["name_ar"], durs.get(k)] + [s.get("crew", {}).get(x) for x in res]
         for c, v in enumerate(row, 1):
             cw.cell(r, c, v)
@@ -321,7 +321,7 @@ def write_programme(P, acts, cal, links, data, path, feed=None):
         ck["A1"].font = st["title"]
         head_row(ck, 3, ["Item", "From", "To", "Basis"], st, [46, 12, 12, 14])
         A = {a["code"]: a for a in acts}
-        vert = [a for a in acts if a["step"] in S["sequence"].get("VERT", [])]
+        vert = [a for a in acts if a["step"] in S.get("sequence", {}).get("VERT", [])]
         rows = [("Erection (A1020)", A["A1020"]["baseline_start"], A["A1020"]["baseline_finish"], "Baseline logic")]
         if vert:
             rows.append(("Working period (first to last vertical activity)", min(a["baseline_start"] for a in vert),
@@ -358,13 +358,18 @@ def write_programme(P, acts, cal, links, data, path, feed=None):
     for eid, l in links.items():
         for t in l["tasks"]:
             per.setdefault(t, []).append(eid)
-    part_of = {s: g for g, ss in S["sequence"].items() for s in ss}
+    part_of = {s: g for g, ss in S.get("sequence", {}).items() for s in ss}
+    lgroup = {}
+    for eid, l in links.items():
+        for c_ in l["tasks"]:
+            lgroup.setdefault(c_, l.get("group"))
     r = 5
     for a in acts:
         if a["code"] not in per:
             continue
         ids = per[a["code"]]
-        row = [a["code"], a["name"], a["floor"], a["wing"], part_of.get(a["step"]), len(ids), round(sum(vol[i] for i in ids), 1)]
+        row = [a["code"], a["name"], a["floor"], a["wing"], part_of.get(a["step"]) or a.get("package") or lgroup.get(a["code"]),
+               len(ids), round(sum(vol[i] for i in ids), 1)]
         for c, v in enumerate(row, 1):
             el.cell(r, c, v)
         r += 1
@@ -374,17 +379,25 @@ def write_programme(P, acts, cal, links, data, path, feed=None):
     asn["A1"] = "Assumptions and notes"
     asn["A1"].font = st["title"]
     K = S.get("duration_scale", 1)
-    cyc = ", ".join(f"{k} {durs.get(k)}" for g in ("SLB", "VERT") for k in S["sequence"].get(g, []))
-    raft = ", ".join(f"{k} {durs.get(k)}" for k in S["sequence"].get("FND", []))
+    sd_, ce_ = d(S.get("start") or acts[0]["baseline_start"]), d(S.get("contract_end"))
+    supplied = all(a.get("tf") is None for a in acts)
     notes = [
-        f"1. Programme start {d(S['start']):%d-%b-%Y}, contract completion {d(S['contract_end']):%d-%b-%Y}." +
+        f"1. Programme start {min(d(a['baseline_start']) for a in acts):%d-%b-%Y}" +
+        (f", contract completion {ce_:%d-%b-%Y}." if ce_ else ".") +
         (f" Baseline durations scaled x{K} ({S.get('duration_scale_note', 'project.json')}); crews are the Crews sheet figures (ASSUMED)." if K != 1 else ""),
-        f"2. Work week: {cal.name}, {P['calendar'].get('hours_per_day', 8)} hours. Holidays loaded: {len(P['calendar'].get('holidays', []))}.",
-        f"3. Floor cycle (working days): {cyc}. Zones follow the first zone by an SS lag of {S['logic']['zone_ss_lag']} days.",
-        f"4. Raft: {raft} working days per zone (ASSUMED).",
+        f"2. Work week: {cal.name}, {P['calendar'].get('hours_per_day', 8)} hours. Holidays loaded: {len(P['calendar'].get('holidays', []))}."]
+    if supplied:
+        notes += ["3. Dates are the approved programme dates as supplied (no CPM logic in this file: float not calculated).",
+                  f"4. Source: {S.get('source_note', 'supplied activities file')}."]
+    else:
+        cyc = ", ".join(f"{k} {durs.get(k)}" for g in ("SLB", "VERT") for k in S["sequence"].get(g, []))
+        raft = ", ".join(f"{k} {durs.get(k)}" for k in S["sequence"].get("FND", []))
+        notes += [f"3. Floor cycle (working days): {cyc}. Zones follow the first zone by an SS lag of {S['logic']['zone_ss_lag']} days.",
+                  f"4. Raft: {raft} working days per zone (ASSUMED)."]
+    notes += [
         "5. Crews and equipment (Crews sheet) are ASSUMED planning figures.",
         "6. Tower crane position, jib radius and hook height are as in project.json (Crane sheet).",
-        "7. Excavation, MEP and finishes are outside this structural programme.",
+        "7. Scope not modelled as elements is scheduled and costed at activity level only.",
         "8. Actual / forecast rows come from the Update sheet at the data date; replace them with site records.",
         "9. The XER carries durations, logic and resource assignments; P6 calculates dates on import (F9). "
         "If the import complains about resources, import without them first."]
@@ -397,7 +410,8 @@ def write_programme(P, acts, cal, links, data, path, feed=None):
     sm["A1"].font = st["title"]
     bfin = max(d(a["baseline_finish"]) for a in acts)
     ffin = max(d(F[c]["upd_finish"]) for c in F) if F else bfin
-    rows = [("Project start", d(S["start"])), ("Contract completion", d(S["contract_end"])), ("Baseline finish", bfin),
+    rows = [("Project start", min(d(a["baseline_start"]) for a in acts)),
+            ("Contract completion", d(S.get("contract_end")) or bfin), ("Baseline finish", bfin),
             ("Float to contract (calendar days)", "=B4-B5"), ("Forecast finish (current logic)", ffin),
             ("Forecast slip vs baseline (calendar days)", "=B7-B5"), ("Data date", "=Programme!B2"),
             ("Activities (incl. milestones)", len(acts)),

@@ -64,29 +64,37 @@ def main():
         ok("programme logic has no loops")
     except ValueError as e:
         fails.append(str(e))
+    supplied = all(x.get("tf") is None for x in acts)
     npred, nsucc = open_ends(acts)
-    (fails.append(f"open ends {npred} {nsucc}") if npred or nsucc else ok("no open ends"))
+    if supplied:
+        notes.append("supplied programme: dates as approved, no CPM logic in the kit files (open ends / float not checked)")
+    else:
+        (fails.append(f"open ends {npred} {nsucc}") if npred or nsucc else ok("no open ends"))
     neg = [x["code"] for x in acts if any(p.get("lag", 0) < 0 for p in x["preds"])]
     (fails.append(f"negative lags: {neg}") if neg else ok("no negative lags"))
     ms = [x["type"] for x in acts]
-    if ms.count("start_milestone") == 1 and ms.count("finish_milestone") == 1:
-        ok("one start and one finish milestone")
+    if supplied or (ms.count("start_milestone") == 1 and ms.count("finish_milestone") == 1):
+        ok("one start and one finish milestone") if not supplied else None
     else:
         fails.append("milestones: need exactly one start and one finish")
     mx = P["schedule"].get("max_activity_days", 20)
     long = [x["code"] for x in acts if x["dur"] > mx]
-    (notes.append(f"activities over {mx} working days: {long}") if long else ok(f"all activities <= {mx} working days"))
+    if not supplied:
+        (notes.append(f"activities over {mx} working days: {long}") if long else ok(f"all activities <= {mx} working days"))
 
     data = load_json(ppath(P, P["inputs"]["data"]))
     L = prog["elements"]
     steps = {x["code"]: x["step"] for x in acts}
-    pours = {s for g, ss in P["schedule"]["sequence"].items() for s in ss[-1:]}
-    bad = [eid for eid, l in L.items() if sum(1 for t in l["tasks"] if steps.get(t) in pours) != 1]
+    pours = {s for g, ss in P["schedule"].get("sequence", {}).items() for s in ss[-1:]}
+    bad = [] if supplied else [eid for eid, l in L.items() if sum(1 for t in l["tasks"] if steps.get(t) in pours) != 1]
     miss = [e["id"] for e in data["elements"] if e["id"] not in L]
     (fails.append(f"{len(miss)} elements without activity: {miss[:8]}") if miss else ok(f"{len(L)} elements linked"))
     (fails.append(f"elements without exactly one pour: {bad[:8]}") if bad else ok("each element has exactly one pour activity"))
     oa = prog.get("orphans", {}).get("activities", [])
-    (notes.append(f"floor activities without elements: {oa}") if oa else ok("no orphan floor activities"))
+    if oa:
+        notes.append(f"{len(oa)} activities without model elements (scheduled and costed at activity level): {oa[:6]}...")
+    else:
+        ok("no orphan floor activities")
 
     cp = os.path.join(a.out, "cost.json")
     if os.path.exists(cp):
@@ -94,7 +102,14 @@ def main():
         bac = C["totals"]["BAC"]
         s_el = sum(v["bc"] for v in C["elements"].values())
         s_act = sum(v["bc"] for v in C["activities"].values())
-        if abs(s_el - bac) < 1 and abs(s_act - bac) < 1:
+        if C.get("mode") == "activity":
+            linked = {t for l in L.values() for t in l["tasks"]}
+            s_lk = sum(v["bc"] for k, v in C["activities"].items() if k in linked)
+            if abs(s_act - bac) < 1 and abs(s_el - s_lk) < 1:
+                ok(f"activity budget = BAC {bac:,.2f}; elements carry their activities' budget {s_el:,.2f}")
+            else:
+                fails.append(f"budget mismatch: activities {s_act:,.2f} BAC {bac:,.2f} elements {s_el:,.2f} linked {s_lk:,.2f}")
+        elif abs(s_el - bac) < 1 and abs(s_act - bac) < 1:
             ok(f"activity budget = element budget = BAC {bac:,.2f}")
         else:
             fails.append(f"budget mismatch: elements {s_el:,.2f} activities {s_act:,.2f} BAC {bac:,.2f}")

@@ -1,3 +1,7 @@
 out/
 __pycache__/
 *.pyc
+# project data built by adapters (confidential sources) — rebuild locally
+examples/reveal-eb/data.json
+examples/reveal-eb/activities.json
+examples/reveal-eb/links.json

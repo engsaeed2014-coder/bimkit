@@ -19,16 +19,16 @@ from common import Calendar, d, die, fname, iso, load_json, load_project, ppath,
 import progxlsx
 
 
-def run(P, prog, sheet=None, data_date=None, keep_sheet=False):
+def run(P, prog, sheet=None, data_date=None, keep_sheet=False, assume=False):
     S, C = P["schedule"], P["calendar"]
-    cal = Calendar(S["start"], C.get("off_weekdays", [4]), C.get("holidays", []), C.get("name"))
+    cal = Calendar(prog.get("start") or S["start"], C.get("off_weekdays", [4]), C.get("holidays", []), C.get("name"))
     acts = prog["activities"]
     A = {a["code"]: a for a in acts}
     rows, dd = {}, d(data_date) if data_date else None
     if sheet:
         sdd, rows = progxlsx.read_update(P, sheet)
         dd = dd or sdd
-    dd = dd or d(S["start"])
+    dd = dd or cal.start
     ddi = cal.index(dd, "prev") if dd >= cal.start else -1
     tr = progxlsx.labour_trades(P)
     warn, resched = [], []
@@ -62,9 +62,18 @@ def run(P, prog, sheet=None, data_date=None, keep_sheet=False):
             elif t == "FF":
                 es = max(es, bend + lag - a["dur"])
         if a["type"] == "finish_milestone":
-            f = max(U[p["task"]]["f"] for p in a["preds"])
+            f = max([U[p["task"]]["f"] for p in a["preds"]] or [a["es"]])
             allp = all(U[p["task"]]["pct"] >= 1 for p in a["preds"])
             U[c] = dict(s=f, f=f, pct=1.0 if allp else 0.0, crew={})
+            continue
+        if assume and r and r.get("pct", 0) == 0 and r.get("start") == d(a["baseline_start"]) \
+                and r.get("finish") == d(a["baseline_finish"]):
+            r = {}          # untouched template row = no site record
+        if assume and not r:
+            # no site record: ASSUMED progress = elapsed share of the baseline at the data date
+            s0, f0 = a["es"], a["ef"] - 1
+            pa = 0.0 if ddi < s0 else (1.0 if ddi >= f0 else (ddi - s0 + 1) / (f0 - s0 + 1))
+            U[c] = dict(s=s0, f=f0, pct=pa, crew=crew_act)
             continue
         st, fi = r.get("start"), r.get("finish")
         si = cal.index(st) if st else None
@@ -122,6 +131,9 @@ def run(P, prog, sheet=None, data_date=None, keep_sheet=False):
                  total_float_days=a["tf"], predecessors=a["preds"])
         if u["crew"] != a["crew"] and a["type"] == "task":
             o["crew_actual"] = u["crew"]
+        for k in ("budget", "package", "group"):
+            if k in a:
+                o[k] = a[k]
         out_acts.append(o)
 
     # daily series
@@ -169,13 +181,15 @@ def run(P, prog, sheet=None, data_date=None, keep_sheet=False):
                   erect_task="A1020", dismantle_task="A9000" if "A9000" in O else None)
     bfin = max(d(a["baseline_finish"]) for a in acts)
     ufin = max(d(o["upd_finish"]) for o in out_acts)
-    feed = dict(project=P["project"]["name"], calendar=cal.name, start=S["start"], contract_end=S.get("contract_end"),
+    feed = dict(project=P["project"]["name"], calendar=cal.name, start=cal.start.isoformat(), contract_end=S.get("contract_end"),
                 data_date=iso(dd), duration_scale=S.get("duration_scale", 1),
                 duration_scale_note=S.get("duration_scale_note", ""), resources=P["resources"], crane=cr,
                 zones=[{k: z_[k] for k in ("code", "name", "name_ar")} for z_ in S["zones"]], floors=S["floors"],
                 floor_names_ar={k: v for k, v in S.get("floor_names_ar", {}).items() if k in S["floors"]},
                 activities=out_acts, elements=prog["elements"], daily=daily,
-                delay_days=(ufin - bfin).days, baseline_finish=iso(bfin), forecast_finish=iso(ufin))
+                delay_days=(ufin - bfin).days, baseline_finish=iso(bfin), forecast_finish=iso(ufin),
+                progress_basis=("ASSUMED: elapsed share of the baseline for activities without a site record"
+                                if assume else "Update sheet"))
     return feed, cal, warn, resched
 
 
@@ -208,6 +222,8 @@ def main():
     ap.add_argument("out")
     ap.add_argument("sheet", nargs="?", help="Update sheet (default: inputs.update in project.json, else out/<Prefix>_Update.xlsx)")
     ap.add_argument("--data-date")
+    ap.add_argument("--assume-baseline-progress", action="store_true",
+                    help="activities missing from the sheet progress on their baseline dates (ASSUMED)")
     ap.add_argument("--keep-sheet-forecast", action="store_true",
                     help="use forecast dates from the sheet even when they break the logic")
     a = ap.parse_args()
@@ -220,7 +236,7 @@ def main():
     if not sheet or not os.path.exists(sheet):
         alt = os.path.join(a.out, fname(P, "Update.xlsx"))
         sheet = alt if os.path.exists(alt) else None
-    feed, cal, warn, resched = run(P, prog, sheet, a.data_date, a.keep_sheet_forecast)
+    feed, cal, warn, resched = run(P, prog, sheet, a.data_date, a.keep_sheet_forecast, a.assume_baseline_progress)
     save_json(feed, os.path.join(a.out, "feed.json"))
     # refresh programme workbook with actual rows
     from common import cpm

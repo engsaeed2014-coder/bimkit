@@ -31,13 +31,16 @@ def rings_for(P, data, off):
     for z in S["zones"]:
         polys = []
         for e in data["elements"]:
-            if e["floor"] != fl or S["groups"].get(e["type"]) != "SLB" or zone_of(e, [z]) != z["code"]:
+            ez = e.get("zone") or zone_of(e, [z])
+            if e["floor"] != fl or S["groups"].get(e["type"]) != "SLB" or ez != z["code"]:
                 continue
             g = e.get("geom") or {}
-            if len(g.get("outer", [])) >= 3:
-                p = Polygon(g["outer"]).buffer(0)
-                if not p.is_empty:
-                    polys.append(p)
+            rings_ = [pp["outer"] for pp in g.get("parts", [])] or [g.get("outer", [])]
+            for ring in rings_:
+                if len(ring) >= 3:
+                    p = Polygon(ring).buffer(0)
+                    if not p.is_empty:
+                        polys.append(p)
         if not polys:
             continue
         u = unary_union([p.buffer(0.05, join_style=2) for p in polys]).buffer(-0.05, join_style=2)
@@ -85,15 +88,29 @@ def build_sd(P, data, feed, cost):
         g = e.get("geom") or {"outer": [], "holes": []}
         mv = lambda pts: [[round(x + off[0], 2), round(y + off[1], 2)] for x, y in pts]
         ce = CE.get(e["id"], {})
+        gg = dict(o=mv(g.get("outer", [])), h=[mv(h) for h in g.get("holes", [])])
+        if g.get("parts"):     # merged element: several extrusions shown as one
+            gg["p"] = [[mv(pp["outer"]), [mv(h) for h in pp.get("holes", [])], pp["z0"], pp["z1"]] for pp in g["parts"]]
+        lk = links.get(e["id"], {})
         els.append(dict(id=e["id"], f=e["floor"], t=e["type"], m=e["mark"], ax=e.get("axis"),
                         x=round(e["x"] + off[0], 2), y=round(e["y"] + off[1], 2), z0=e["z0"], z1=e["z1"], v=e["volume_m3"],
-                        g=dict(o=mv(g.get("outer", [])), h=[mv(h) for h in g.get("holes", [])]),
-                        k=links.get(e["id"], {}).get("tasks", []), c=e.get("confidence"), gr=groups.get(e["type"]),
+                        g=gg, k=lk.get("tasks", []), c=e.get("confidence"), gr=lk.get("group") or groups.get(e["type"]),
                         bl=ce.get("bl"), bc=ce.get("bc", 0)))
+    # weights per element group; supplied links use groups W1..Wn = equal shares
+    weights = dict(S.get("weights", {}))
+    for l in links.values():
+        gname = l.get("group")
+        if gname and gname not in weights:
+            n = len(l["tasks"])
+            weights[gname] = [round(1 / n, 6)] * n
+    kind = {k: v.get("part") for k, v in S.get("steps", {}).items() if v.get("part")}
+    for a in feed["activities"]:
+        if a.get("step") and a["step"] not in kind:
+            kind[a["step"]] = V.get("kind", {}).get(a["step"], "pour")
     rings = rings_for(P, data, off)
     xs = [p[0] for r in rings for p in r] or [0]
     ys = [p[1] for r in rings for p in r] or [0]
-    floors = [S["fnd_floor"]] + S["floors"]
+    floors = [S["fnd_floor"]] + [f for f in S["floors"] if f != S["fnd_floor"]]
     lv = data["levels"]
     below = {}
     for i, f in enumerate(floors):
@@ -101,8 +118,8 @@ def build_sd(P, data, feed, cost):
     cr = S.get("crane", {})
     cfg = dict(name=P["project"]["name"], name_ar=P["project"].get("name_ar", P["project"]["name"]),
                subtitle=P["project"].get("subtitle", ""), code=P["project"]["code"], floors=floors,
-               floor_names_ar=S.get("floor_names_ar", {}), groups=groups, weights=S["weights"],
-               kind={k: v.get("part") for k, v in S["steps"].items() if v.get("part")},
+               floor_names_ar=S.get("floor_names_ar", {}), groups=groups, weights=weights,
+               kind=kind,
                trades={k: P["resources"][k].get("color") or "#cccccc" for k in tr}, zones=feed["zones"],
                bbox=[min(xs), max(xs), min(ys), max(ys)], off_weekdays=P["calendar"].get("off_weekdays", [4]),
                cx=cr.get("x", (min(xs) + max(xs)) / 2), crane_on=bool(cr.get("enabled")),

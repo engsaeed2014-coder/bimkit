@@ -42,7 +42,8 @@ def write_xer(P, acts, cal, path):
     hpd = C.get("hours_per_day", 8)
     work_days = 7 - len(C.get("off_weekdays", [4]))
     now = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
-    start = S["start"] + " 00:00"
+    start = cal.start.isoformat() + " 00:00"
+    end_ = S.get("contract_end") or max(a.get("baseline_finish") or cal.start.isoformat() for a in acts)
     cur = P["project"].get("currency", "EGP")
     T = {k: [] for k in F}
     T["CURRTYPE"].append(dict(curr_id=1, decimal_digit_cnt=2, curr_symbol=cur[:1], decimal_symbol=".", digit_group_symbol=",",
@@ -62,15 +63,16 @@ def write_xer(P, acts, cal, path):
                              add_act_remain_flag="N", act_this_per_link_flag="N", def_task_type="TT_Task",
                              act_pct_link_flag="N", add_date=now, def_rsrc_roll_on_flag="N", loaded_scope_level=7,
                              export_flag="Y", close_period_flag="N", trsrcsum_loaded="N", plan_start_date=start,
-                             plan_end_date=(S.get("contract_end") or S["start"]) + " 00:00", last_recalc_date=start))
+                             plan_end_date=end_[:10] + " 00:00", last_recalc_date=start))
     # WBS tree
-    codes = sorted({a["wbs"] for a in acts if a["wbs"]}, key=lambda s: [int(x) for x in s.split(".")])
+    K = lambda s: [(0, int(x), "") if x.isdigit() else (1, 0, x) for x in s.split(".")]
+    codes = sorted({a["wbs"] for a in acts if a["wbs"]}, key=K)
     allc = set()
     for c in codes:
         parts = c.split(".")
         for i in range(1, len(parts) + 1):
             allc.add(".".join(parts[:i]))
-    allc = sorted(allc, key=lambda s: [int(x) for x in s.split(".")])
+    allc = sorted(allc, key=K)
     zones = {z["code"]: z for z in S["zones"]}
     wid = {}
     for i, c in enumerate(allc):
@@ -85,7 +87,7 @@ def write_xer(P, acts, cal, path):
             elif a and a["floor"]:
                 name = f"{a['floor']} floor"
             else:
-                name = c
+                name = c.split(".")[-1].replace("_", " ")
         parent = ".".join(c.split(".")[:-1])
         T["PROJWBS"].append(dict(wbs_id=wid[c], proj_id=1, obs_id=1, seq_num=(i + 1) * 10, est_wt=1,
                                  proj_node_flag="Y" if c == "1" else "N", sum_data_flag="N", status_code="WS_Open",

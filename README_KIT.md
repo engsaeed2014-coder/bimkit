@@ -23,7 +23,9 @@ pip install openpyxl shapely --break-system-packages
 | `verify.py` | فحص قبل التسليم (المنطق، الربط، الميزانية، Excel بدون أخطاء، مفيش أسعار بيع). |
 | `xer.py`, `progxlsx.py`, `common.py` | قراءة وكتابة XER، ملفات Excel الخاصة بالبرنامج، والتقويم وحساب الـ CPM. |
 | `templates/` | صفحة العرض المعتمدة (shell + 3D + 4D/5D). متتعدلش غير لو هنغيّر شكل الصفحة نفسها. |
+| `adapters/reveal4d.py` | محوّل REVEAL: موديل reveal-4d + الماستر المعتمد → `data.json` و`activities.json` و`links.json`. |
 | `examples/bicon/` | مثال كامل شغّال (مشروع تدريب) للمقارنة. |
+| `examples/reveal-eb/` | `project.json` لبلوك EB. ملفات البيانات بتتعمل بالمحوّل ومش بتترفع، لأنها من ملفات المشروع السرية. |
 
 ## التشغيل
 
@@ -47,6 +49,25 @@ python3 verify.py $P $O
 ```
 
 كل أمر بيطبع ملخص قصير: الـ BAC، العناصر اللي ملهاش قاعدة سعر (لازم تبقى 0)، والأسعار المستخدمة.
+
+## برنامج معتمد جاهز (خرسانة + تشطيبات)
+
+لو المشروع عنده ماستر معتمد بتواريخه وبالـ cost loading بتاعه، الـ kit بياخده زي ما هو من غير ما يولّد برنامج:
+
+```bash
+python3 adapters/reveal4d.py --reveal4d ../reveal-4d --master master.xlsx --area EB --out examples/reveal-eb
+python3 schedule.py examples/reveal-eb/project.json out      # inputs.activities + inputs.links
+python3 update.py   examples/reveal-eb/project.json out --data-date 2026-11-22 --assume-baseline-progress
+python3 cost.py     examples/reveal-eb/project.json out      # budget mode: activity
+python3 viewer.py   examples/reveal-eb/project.json out
+```
+
+- `activities.json`: فيه لكل نشاط الكود، والاسم، والدور، والزون، والبداية والنهاية، وكمان `budget` = الكمية، والوحدة، والسعر، والتكلفة، والمصدر.
+- التواريخ بتتاخد زي ما هي من غير CPM. عشان كده الـ float مش بيتحسب.
+- `links.json`: كل عنصر في الموديل وأنشطته. النشاط اللي مالوش عنصر بيدخل الـ 4D والـ 5D على مستوى النشاط بس.
+- العنصر ممكن يكون مجمّع من قطع كتير (`geom.parts`). الصفحة بتدمجهم في شكل واحد، وده بيخلي بلوك فيه 6 عمارات يتعرض بسرعة.
+- `--assume-baseline-progress`: أي نشاط ملوش سجل في شيت الـ Update بيمشي على تواريخ البيز لاين، والتقدم بيبقى ASSUMED لحد ما سجلات الموقع توصل.
+- لما الميزانية تكون جاية من الأنشطة، `cost.budget_note` بيوضّح مصدرها في كل الملفات.
 
 ## project.json — أهم الأجزاء
 

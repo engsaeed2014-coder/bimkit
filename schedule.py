@@ -208,6 +208,57 @@ def from_xer(P, path):
     return acts
 
 
+# ---------------------------------------------------------------- supplied programme
+def from_activities(P, path):
+    """Activities supplied as JSON (an approved master converted by an adapter).
+
+    Each record: code, name, name_ar, type (task / start_milestone / finish_milestone), wbs, floor, zone,
+    step, start, finish (YYYY-MM-DD), optional dur, preds [{task,type,lag}], crew {trade: n},
+    budget {qty, unit, rate, cost, ref, source, status}. Dates are kept as given (no CPM) unless
+    schedule.recalc_supplied is true and logic is present.
+    """
+    src = load_json(path)
+    recs = src["activities"] if isinstance(src, dict) else src
+    acts = []
+    for r in recs:
+        typ = r.get("type", "task")
+        a = dict(code=str(r["code"]), type=typ, wbs=r.get("wbs") or "", floor=r.get("floor"), wing=r.get("zone"),
+                 step=r.get("step"), part=r.get("part"), dur=r.get("dur"), crew=dict(r.get("crew") or {}),
+                 preds=list(r.get("preds") or []), name=r.get("name") or r["code"],
+                 name_ar=r.get("name_ar") or r.get("name") or r["code"],
+                 given_start=r.get("start"), given_finish=r.get("finish"))
+        if r.get("budget"):
+            a["budget"] = r["budget"]
+        for k in ("group", "package", "note"):
+            if r.get(k) is not None:
+                a[k] = r[k]
+        acts.append(a)
+    return acts
+
+
+def links_from_file(acts, data, path):
+    """Element -> activity links supplied by an adapter: {element_id: [codes]} (or a single code)."""
+    raw = load_json(path)
+    A = {a["code"]: a for a in acts}
+    links, orphans_el, missing = {}, [], set()
+    for el in data["elements"]:
+        v = raw.get(el["id"])
+        tasks = [v] if isinstance(v, str) else list(v or [])
+        bad = [c for c in tasks if c not in A]
+        missing.update(bad)
+        tasks = [c for c in tasks if c in A]
+        if not tasks:
+            orphans_el.append(el["id"])
+            continue
+        links[el["id"]] = dict(first=tasks[0], pour=tasks[-1], tasks=tasks, group=f"W{len(tasks)}",
+                               zone=el.get("zone") or A[tasks[0]].get("wing"))
+    used = {t for l in links.values() for t in l["tasks"]}
+    orphans_act = [a["code"] for a in acts if a["type"] == "task" and a["code"] not in used]
+    if missing:
+        print(f"WARNING: links name {len(missing)} codes that are not activities: {sorted(missing)[:8]}")
+    return links, orphans_el, orphans_act
+
+
 # ---------------------------------------------------------------- links
 def link_elements(P, acts, data):
     S = P["schedule"]
@@ -232,29 +283,52 @@ def link_elements(P, acts, data):
 
 
 # ---------------------------------------------------------------- main
-def build(P, acts, data):
+def build(P, acts, data, links_path=None):
     S = P["schedule"]
     C = P["calendar"]
-    cal = Calendar(S["start"], C.get("off_weekdays", [4]), C.get("holidays", []), C.get("name"))
-    cpm(acts)
+    supplied = any("given_start" in a for a in acts)
+    start = S.get("start")
+    if supplied:
+        given = [d(a["given_start"]) for a in acts if a.get("given_start")]
+        start = min([d(start)] + given if start else given).isoformat()
+    cal = Calendar(start, C.get("off_weekdays", [4]), C.get("holidays", []), C.get("name"))
+    if supplied and not (S.get("recalc_supplied") and any(a["preds"] for a in acts)):
+        for a in acts:
+            if not a.get("given_start") or not a.get("given_finish"):
+                raise ValueError(f"{a['code']}: supplied activity without start/finish")
+            a["es"] = cal.index(a["given_start"])
+            fi = max(cal.index(a["given_finish"], "prev"), a["es"])
+            a["ef"] = a["es"] if a["type"] != "task" else fi + 1
+            a["dur"] = a["ef"] - a["es"]
+            a["ls"] = a["lf"] = a["tf"] = None
+    else:
+        cpm(acts)
     for a in acts:
         bs, bf = task_dates(cal, a, a["es"], a["ef"])
         a["baseline_start"], a["baseline_finish"] = iso(bs), iso(bf)
         a["total_float_days"] = a["tf"]
-    links, oe, oa = link_elements(P, acts, data)
+        a.pop("given_start", None)
+        a.pop("given_finish", None)
+    if links_path:
+        links, oe, oa = links_from_file(acts, data, links_path)
+    else:
+        links, oe, oa = link_elements(P, acts, data)
     return cal, links, oe, oa
 
 
 def checks(P, acts, links, oe, oa, data):
     msgs = []
+    supplied = all(a.get("tf") is None for a in acts)
+    if supplied:
+        msgs.append("supplied programme: dates kept as given, no CPM logic (float not calculated)")
     npred, nsucc = open_ends(acts)
-    if npred or nsucc:
+    if (npred or nsucc) and not supplied:
         msgs.append(f"open ends: no predecessor {npred}, no successor {nsucc}")
     if any(p.get("lag", 0) < 0 for a in acts for p in a["preds"]):
         msgs.append("negative lags present")
     mx = P["schedule"].get("max_activity_days", 20)
     long = [a["code"] for a in acts if a["dur"] > mx]
-    if long:
+    if long and not supplied:
         msgs.append(f"activities longer than {mx} working days: {long}")
     if oe:
         msgs.append(f"{len(oe)} model elements without an activity: {oe[:10]}")
@@ -262,7 +336,7 @@ def checks(P, acts, links, oe, oa, data):
         msgs.append(f"{len(oa)} floor activities without model elements: {oa[:10]}")
     starts = [a for a in acts if a["type"] == "start_milestone"]
     fins = [a for a in acts if a["type"] == "finish_milestone"]
-    if len(starts) != 1 or len(fins) != 1:
+    if (len(starts) != 1 or len(fins) != 1) and not supplied:
         msgs.append(f"expected one start and one finish milestone, got {len(starts)}/{len(fins)}")
     return msgs
 
@@ -272,14 +346,26 @@ def main():
     ap.add_argument("project")
     ap.add_argument("out")
     ap.add_argument("--xer", help="existing baseline XER to use instead of the generator")
+    ap.add_argument("--activities", help="supplied programme JSON (approved master via an adapter); dates kept")
+    ap.add_argument("--links", help="element -> activity links JSON (from the adapter)")
     ap.add_argument("--force-update-sheet", action="store_true", help="overwrite an existing Update sheet")
     a = ap.parse_args()
     P = load_project(a.project)
     data = load_json(ppath(P, P["inputs"]["data"]))
-    acts = from_xer(P, a.xer) if a.xer else generate(P)
-    cal, links, oe, oa = build(P, acts, data)
+    acts_path = a.activities or ppath(P, P["inputs"].get("activities"))
+    links_path = a.links or ppath(P, P["inputs"].get("links"))
+    if a.xer:
+        acts = from_xer(P, a.xer)
+    elif acts_path:
+        acts = from_activities(P, acts_path)
+    else:
+        acts = generate(P)
+    try:
+        cal, links, oe, oa = build(P, acts, data, links_path)
+    except ValueError as e:
+        die(str(e))
     os.makedirs(a.out, exist_ok=True)
-    prog = dict(project=P["project"]["name"], calendar=cal.name, start=P["schedule"]["start"],
+    prog = dict(project=P["project"]["name"], calendar=cal.name, start=cal.start.isoformat(),
                 contract_end=P["schedule"].get("contract_end"), duration_scale=P["schedule"].get("duration_scale", 1),
                 activities=acts, elements=links, orphans=dict(elements=oe, activities=oa))
     save_json(prog, os.path.join(a.out, "programme.json"))
@@ -298,7 +384,7 @@ def main():
     progxlsx.write_programme(P, acts, cal, links, data, os.path.join(a.out, fname(P, "Programme.xlsx")), feed)
 
     fin = max(a_["baseline_finish"] for a_ in acts)
-    crit = sum(1 for x in acts if x["tf"] <= 0)
+    crit = sum(1 for x in acts if x["tf"] is not None and x["tf"] <= 0)
     print(f"activities {len(acts)} | baseline finish {fin} | contract end {P['schedule'].get('contract_end')} | critical {crit}")
     print(f"elements linked {len(links)}/{len(data['elements'])}")
     for m in checks(P, acts, links, oe, oa, data):

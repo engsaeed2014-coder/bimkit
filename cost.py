@@ -130,27 +130,64 @@ def load_ac(path, codes):
     return d(ws["D2"].value), ac
 
 
+def activity_budget(P, feed, data):
+    """Budget already loaded on the activities (approved master): distribute it on the linked elements."""
+    acts = feed["activities"]
+    vol = {e["id"]: e["volume_m3"] for e in data["elements"]}
+    per = {}
+    for eid, l in feed["elements"].items():
+        for t in l["tasks"]:
+            per.setdefault(t, []).append(eid)
+    bc, q, E, lines, used = {}, {}, {}, [], {}
+    for a in acts:
+        b = a.get("budget") or {}
+        cost = float(b.get("cost") or 0)
+        bc[a["code"]] = cost
+        q[a["code"]] = float(b.get("qty") or 0)
+        if b:
+            lines.append(dict(code=a["code"], desc=a["name"], ref=b.get("ref"), qty=b.get("qty"), unit=b.get("unit"),
+                              rate=b.get("rate"), cost=cost, source=b.get("source"), status=b.get("status"),
+                              package=a.get("package")))
+        els = per.get(a["code"], [])
+        tv = sum(vol[e] for e in els)
+        for eid in els:
+            share = vol[eid] / tv if tv else 1 / len(els)
+            x = E.setdefault(eid, dict(bc=0.0, label=a.get("package") or a["name"], parts=[]))
+            x["bc"] += cost * share
+            x["parts"].append(dict(desc=a["name"], rate=b.get("rate") or 0, basis="activity share",
+                                   qty=share, cost=cost * share))
+    for x in E.values():
+        x["bc"] = round(x["bc"], 2)
+    return bc, q, E, lines
+
+
 def run(P, feed, data, rates, ac_file=None, data_date=None):
     S, C = P["schedule"], P["calendar"]
-    cal = Calendar(S["start"], C.get("off_weekdays", [4]), C.get("holidays", []), C.get("name"))
-    lines = rates["lines"]
-    E, unmatched, missing, used = price(P, data, lines)
-    W = S["weights"]
-    seq = S["sequence"]
-    pos = {s: (g, i) for g, ss in seq.items() for i, s in enumerate(ss)}
+    cal = Calendar(feed.get("start") or S["start"], C.get("off_weekdays", [4]), C.get("holidays", []), C.get("name"))
     acts = feed["activities"]
-    bc = {a["code"]: 0.0 for a in acts}
-    q = {a["code"]: 0.0 for a in acts}
-    vol = {e["id"]: e["volume_m3"] for e in data["elements"]}
-    for eid, l in feed["elements"].items():
-        if eid not in E:
-            continue
-        for t in l["tasks"]:
-            st = next(a["step"] for a in acts if a["code"] == t)
-            g, i = pos[st]
-            w = W[g][i]
-            bc[t] += E[eid]["bc"] * w
-            q[t] += vol[eid] * w
+    mode = "activity" if any(a.get("budget") for a in acts) else "rules"
+    if mode == "activity":
+        bc, q, E, lines = activity_budget(P, feed, data)
+        unmatched = [e["id"] for e in data["elements"] if e["id"] not in E]
+        missing, used = [], {}
+    else:
+        lines = rates["lines"]
+        E, unmatched, missing, used = price(P, data, lines)
+        W = S["weights"]
+        seq = S["sequence"]
+        pos = {s: (g, i) for g, ss in seq.items() for i, s in enumerate(ss)}
+        bc = {a["code"]: 0.0 for a in acts}
+        q = {a["code"]: 0.0 for a in acts}
+        vol = {e["id"]: e["volume_m3"] for e in data["elements"]}
+        for eid, l in feed["elements"].items():
+            if eid not in E:
+                continue
+            for t in l["tasks"]:
+                st = next(a["step"] for a in acts if a["code"] == t)
+                g, i = pos[st]
+                w = W[g][i]
+                bc[t] += E[eid]["bc"] * w
+                q[t] += vol[eid] * w
     dd = d(data_date or feed["data_date"])
     ac_in, ac_src = {}, None
     if ac_file:
@@ -173,7 +210,9 @@ def run(P, feed, data, rates, ac_file=None, data_date=None):
             acv = round(b * af * ev, 2)
         rows.append(dict(code=c, name=a["name_ar"], floor=a["floor"], step=a["step"], type=a["type"],
                          bs=a["baseline_start"], bf=a["baseline_finish"], us=a["upd_start"], uf=a["upd_finish"],
-                         bc=b, q=round(q[c], 4), pv_pct=pv, ev_pct=ev, pv=b * pv, ev=b * ev, ac=acv, af=af))
+                         bc=b, q=round(q[c], 4), pv_pct=pv, ev_pct=ev, pv=b * pv, ev=b * ev, ac=acv, af=af,
+                         unit=(a.get("budget") or {}).get("unit") if mode == "activity" else "m3 eq.",
+                         ref=(a.get("budget") or {}).get("ref")))
     T = dict(BAC=sum(r["bc"] for r in rows), PV=sum(r["pv"] for r in rows), EV=sum(r["ev"] for r in rows),
              AC=sum(r["ac"] for r in rows))
     T["CPI"] = T["EV"] / T["AC"] if T["AC"] else 0
@@ -188,7 +227,7 @@ def run(P, feed, data, rates, ac_file=None, data_date=None):
     else:
         T["ac_source"] = "AC = budget cost of executed work (CPI 1.0)"
     return dict(cal=cal, E=E, rows=rows, T=T, dd=dd, unmatched=unmatched, missing=missing, used=used, lines=lines,
-                ac_assumed=(not ac_src and bool(facs)))
+                ac_assumed=(not ac_src and bool(facs)), mode=mode)
 
 
 # ---------------------------------------------------------------- workbooks
@@ -202,18 +241,32 @@ def write_budget(P, R, data, feed, path):
     ur = wb.create_sheet("Unit Rates")
     eb = wb.create_sheet("Element Budget")
     ab = wb.create_sheet("Activity Budget")
-    ur["A1"] = f"{P['project']['name']} — Structural Budget (5D input) / ميزانية الهيكل"
+    ur["A1"] = f"{P['project']['name']} — Budget (5D input) / الميزانية"
     ur["A1"].font = st["title"]
-    ur["A2"] = ("Budget rates = study-cost rates READ from the project cost sheet (cost ÷ quantity). "
-                "Units: m3 for RC lines, m2 for blinding / waterproofing. Direct cost only.")
-    head_row(ur, 4, ["Cost line / بند التكلفة", "Quantity", f"Budget cost ({cur})", f"Budget rate ({cur}/unit)", "Unit", "Used"],
-             st, [70, 12, 16, 16, 7, 7])
-    for i, l in enumerate(R["lines"], 5):
-        for c, v in enumerate([l["desc"], l["qty"], l["cost"], f"=C{i}/B{i}", l.get("unit"),
-                               "Y" if l["desc"] in R["used"] else ""], 1):
-            cell = ur.cell(i, c, v)
-            if c in (3, 4):
-                cell.number_format = "#,##0.00" if c == 4 else MONEY_FMT
+    if R["mode"] == "activity":
+        ur["A2"] = P["cost"].get("budget_note", "Budget = cost loaded on each activity of the approved programme "
+                                 "(quantity x rate as supplied). Activities with elements share their budget on "
+                                 "the elements by volume.")
+        head_row(ur, 4, ["Activity", "Activity / النشاط", "Package", "BOQ ref", "Quantity", "Unit",
+                         f"Rate ({cur}/unit)", f"Budget cost ({cur})", "Source", "Status"],
+                 st, [10, 46, 16, 9, 11, 6, 12, 15, 24, 18])
+        for i, l in enumerate(R["lines"], 5):
+            for c, v in enumerate([l["code"], l["desc"], l.get("package"), l.get("ref"), l.get("qty"), l.get("unit"),
+                                   l.get("rate"), l["cost"], l.get("source"), l.get("status")], 1):
+                cell = ur.cell(i, c, v)
+                if c in (7, 8):
+                    cell.number_format = "#,##0.00" if c == 7 else MONEY_FMT
+    else:
+        ur["A2"] = ("Budget rates = study-cost rates READ from the project cost sheet (cost ÷ quantity). "
+                    "Units: m3 for RC lines, m2 for blinding / waterproofing. Direct cost only.")
+        head_row(ur, 4, ["Cost line / بند التكلفة", "Quantity", f"Budget cost ({cur})", f"Budget rate ({cur}/unit)", "Unit", "Used"],
+                 st, [70, 12, 16, 16, 7, 7])
+        for i, l in enumerate(R["lines"], 5):
+            for c, v in enumerate([l["desc"], l["qty"], l["cost"], f"=C{i}/B{i}", l.get("unit"),
+                                   "Y" if l["desc"] in R["used"] else ""], 1):
+                cell = ur.cell(i, c, v)
+                if c in (3, 4):
+                    cell.number_format = "#,##0.00" if c == 4 else MONEY_FMT
     head_row(eb, 1, ["Element ID", "Floor", "Type", "Mark", "Volume (m3)", "Cost line", f"Budget rate ({cur}/m3 eq.)",
                      f"Budget cost ({cur})", "Linked activities"], st, [26, 7, 6, 8, 11, 26, 14, 14, 24])
     r = 2
@@ -222,7 +275,7 @@ def write_budget(P, R, data, feed, path):
         e = R["E"].get(el["id"])
         if not e:
             continue
-        row = [el["id"], el["floor"], el["type"], el["mark"], el["volume_m3"], e["label"], f"=H{r}/E{r}", e["bc"],
+        row = [el["id"], el["floor"], el["type"], el["mark"], el["volume_m3"], e["label"], f"=IF(E{r}>0,H{r}/E{r},0)", e["bc"],
                ", ".join(links.get(el["id"], {}).get("tasks", []))]
         for c, v in enumerate(row, 1):
             cell = eb.cell(r, c, v)
@@ -234,13 +287,13 @@ def write_budget(P, R, data, feed, path):
     eb.cell(r, 8, f"=SUM(H2:H{r - 1})").number_format = MONEY_FMT
     etot = r
     eb.freeze_panes = "B2"
-    head_row(ab, 1, ["Activity", "Name", "Floor", f"Budget cost ({cur})", "Budget qty (m3 eq.)", "BL Start", "BL Finish"],
-             st, [9, 52, 7, 15, 13, 11, 11])
+    head_row(ab, 1, ["Activity", "Name", "Floor", f"Budget cost ({cur})", "Budget qty", "BL Start", "BL Finish", "Unit"],
+             st, [9, 52, 7, 15, 13, 11, 11, 7])
     r = 2
     for x in R["rows"]:
         if x["type"] != "task":
             continue
-        for c, v in enumerate([x["code"], x["name"], x["floor"], x["bc"], x["q"], d(x["bs"]), d(x["bf"])], 1):
+        for c, v in enumerate([x["code"], x["name"], x["floor"], x["bc"], x["q"], d(x["bs"]), d(x["bf"]), x.get("unit")], 1):
             cell = ab.cell(r, c, v)
             if c == 4:
                 cell.number_format = MONEY_FMT
@@ -250,17 +303,20 @@ def write_budget(P, R, data, feed, path):
     ab.cell(r, 2, "TOTAL").font = st["bold"]
     ab.cell(r, 4, f"=SUM(D2:D{r - 1})").number_format = MONEY_FMT
     atot = r
-    W = P["schedule"]["weights"]
-    wtxt = "; ".join(f"{g} " + "/".join(str(int(round(w * 100))) for w in ws_) + f" ({'/'.join(P['schedule']['sequence'][g])})"
+    W = P["schedule"].get("weights", {})
+    wtxt = "; ".join(f"{g} " + "/".join(str(int(round(w * 100))) for w in ws_) + f" ({'/'.join(P['schedule'].get('sequence', {}).get(g, []))})"
                      for g, ws_ in W.items())
     rows = [("Budget summary / ملخص الميزانية", None),
-            (f"Budget cost — BAC ({cur})", f"='Element Budget'!H{etot}"),
+            (f"Budget cost — BAC ({cur})", f"='Element Budget'!H{etot}" if R["mode"] != "activity" else f"='Activity Budget'!D{atot}"),
             ("Budget quantity (m3 eq.)", f"='Element Budget'!E{etot}"),
-            ("Check: activity budget = element budget", f"=IF(ABS('Activity Budget'!D{atot}-B2)<1,\"OK\",\"CHECK\")"),
+            ("Check: activity budget = element budget", f"=IF(ABS('Activity Budget'!D{atot}-B2)<1,\"OK\",\"CHECK\")")
+            if R["mode"] != "activity" else
+            ("BAC on activities (incl. scope without model elements)", f"='Activity Budget'!D{atot}"),
             (None, None), (None, None),
             ("EV (cost) = budget rate x executed quantity. No client rates in this workbook.", None),
             (f"Actual cost (AC) is entered in {fname(P, 'Cost_Report.xlsx')} (sheet Activity Cost, column O).", None),
-            (f"Stage weights used to load element budget on activities: {wtxt}.", None)]
+            ((f"Stage weights used to load element budget on activities: {wtxt}." if R["mode"] != "activity"
+              else "Budget source: " + P["cost"].get("budget_note", "approved programme cost loading")), None)]
     for i, (k, v) in enumerate(rows, 1):
         sm.cell(i, 1, k)
         if v:
@@ -290,9 +346,9 @@ def write_report(P, R, path):
     ws["A3"] = ("الأصفر = إدخال (AC = التكلفة الفعلية حتى تاريخه). الأزرق الفاتح = بيانات من البرنامج والميزانية. "
                 f"الباقي معادلات. أسعار الميزانية (تكلفة الدراسة) من شيت التكاليف (READ)، {ac_note}")
     hd = ["Code", "Activity / النشاط", "Floor", "Step", "BL Start", "BL Finish", "Upd Start", "Upd Finish",
-          f"Budget cost ({cur})", "Budget qty (m3 eq.)", "PV %", "EV %", f"PV ({cur})", f"EV ({cur})",
-          f"AC to date ({cur})", "CPI", "CV = EV-AC", "SV = EV-PV", f"Budget rate ({cur}/m3 eq.)"]
-    head_row(ws, 5, hd, st, [8, 52, 6, 6, 11, 11, 11, 11] + [14] * 11)
+          f"Budget cost ({cur})", "Budget qty", "PV %", "EV %", f"PV ({cur})", f"EV ({cur})",
+          f"AC to date ({cur})", "CPI", "CV = EV-AC", "SV = EV-PV", f"Budget rate ({cur}/unit)", "Unit"]
+    head_row(ws, 5, hd, st, [8, 52, 6, 6, 11, 11, 11, 11] + [14] * 11 + [7])
     r = 6
     for x in R["rows"]:
         if x["type"] != "task":
@@ -300,8 +356,8 @@ def write_report(P, R, path):
         pv = f'=IF($D$2<E{r},0,IF($D$2>=F{r},1,NETWORKDAYS.INTL(E{r},$D$2,"{mask}")/NETWORKDAYS.INTL(E{r},F{r},"{mask}")))'
         ev = f'=IF($D$2<G{r},0,IF($D$2>=H{r},1,NETWORKDAYS.INTL(G{r},$D$2,"{mask}")/NETWORKDAYS.INTL(G{r},H{r},"{mask}")))'
         row = [x["code"], x["name"], x["floor"], x["step"], d(x["bs"]), d(x["bf"]), d(x["us"]), d(x["uf"]), x["bc"], x["q"],
-               pv, ev, f"=I{r}*K{r}", f"=S{r}*J{r}*L{r}", round(x["ac"], 2), f"=IF(O{r}>0,N{r}/O{r},0)",
-               f"=N{r}-O{r}", f"=N{r}-M{r}", f"=IF(J{r}>0,I{r}/J{r},0)"]
+               pv, ev, f"=I{r}*K{r}", f"=I{r}*L{r}", round(x["ac"], 2), f"=IF(O{r}>0,N{r}/O{r},0)",
+               f"=N{r}-O{r}", f"=N{r}-M{r}", f"=IF(J{r}>0,I{r}/J{r},0)", x.get("unit")]
         for c, v in enumerate(row, 1):
             cell = ws.cell(r, c, v)
             cell.border = st["border"]
@@ -315,7 +371,7 @@ def write_report(P, R, path):
                 cell.number_format = "0%"
             elif c == 16:
                 cell.number_format = "0.00"
-            elif c >= 9:
+            elif 9 <= c <= 19:
                 cell.number_format = MONEY_FMT
         r += 1
     last = r - 1
@@ -359,12 +415,16 @@ def write_report(P, R, path):
     head_row(bl, 1, ["Budget line / بند الميزانية", "Model qty (m3)", f"Budget cost ({cur})", f"Budget rate ({cur}/m3)"],
              st, [30, 14, 16, 16])
     agg = {}
-    for e_id, e in R["E"].items():
+    if R["mode"] == "activity":
+        for l in R["lines"]:
+            a = agg.setdefault(l.get("package") or "-", [0.0, 0.0])
+            a[1] += l["cost"]
+    for e_id, e in (R["E"].items() if R["mode"] != "activity" else []):
         a = agg.setdefault(e["label"], [0.0, 0.0])
         a[1] += e["bc"]
         a[0] += sum(p["qty"] for p in e["parts"] if p["basis"] == "volume_m3")
     for i, (k, (qv, cv)) in enumerate(sorted(agg.items()), 2):
-        for c, v in enumerate([k, round(qv, 1), round(cv), f"=C{i}/B{i}"], 1):
+        for c, v in enumerate([k, round(qv, 1), round(cv), f"=IF(B{i}>0,C{i}/B{i},0)"], 1):
             cell = bl.cell(i, c, v)
             if c >= 3:
                 cell.number_format = MONEY_FMT
@@ -389,10 +449,11 @@ def cost_json(P, R):
         elements={k: dict(bc=v["bc"], bl=v["label"]) for k, v in R["E"].items()},
         activities={x["code"]: dict(bc=x["bc"], q=x["q"], af=x["af"], ac=round(x["ac"], 2)) for x in R["rows"]},
         rates=rates,
-        lines=[dict(desc=l["desc"], qty=l["qty"], cost=l["cost"], unit=l.get("unit")) for l in R["lines"]],
+        lines=[dict(desc=l["desc"], qty=l.get("qty"), cost=l["cost"], unit=l.get("unit")) for l in R["lines"]],
         totals={k: (round(v, 4) if isinstance(v, float) else v) for k, v in R["T"].items()},
-        data_date=iso(R["dd"]), ac_assumed=R["ac_assumed"],
-        src=("Budget rates = cost rates READ from the cost sheet (client sell rates not used); "
+        data_date=iso(R["dd"]), ac_assumed=R["ac_assumed"], mode=R["mode"],
+        src=(P["cost"].get("budget_note") + "; AC = " + R["T"]["ac_source"] if R["mode"] == "activity" and P["cost"].get("budget_note") else
+             "Budget rates = cost rates READ from the cost sheet (client sell rates not used); "
              "EV = budget rate x executed quantity; AC = " +
              ("imagined price factors (ASSUMED)" if R["ac_assumed"] else R["T"]["ac_source"])))
 
@@ -411,9 +472,10 @@ def main():
     feed = load_json(fp)
     data = load_json(ppath(P, P["inputs"]["data"]))
     rp = ppath(P, P["inputs"].get("rates"))
-    if not rp or not os.path.exists(rp):
+    has_budget = any(x.get("budget") for x in feed["activities"])
+    if (not rp or not os.path.exists(rp)) and not has_budget:
         die("rates file not found — run boq_rates.py extract first and set inputs.rates")
-    rates = load_json(rp)
+    rates = load_json(rp) if rp and os.path.exists(rp) else {"lines": []}
     try:
         R = run(P, feed, data, rates, a.ac or ppath(P, P["inputs"].get("cost_report")), a.data_date)
     except ValueError as e:
@@ -426,6 +488,7 @@ def main():
     print(f"BAC {T['BAC']:,.2f} {cur} | data date {iso(R['dd'])}")
     print(f"PV {T['PV']:,.0f} | EV {T['EV']:,.0f} | AC {T['AC']:,.0f} ({T['ac_source']})")
     print(f"CPI {T['CPI']:.3f} | SPI {T['SPI']:.3f} | CV {T['CV']:,.0f} | EAC {T['EAC']:,.0f} | VAC {T['VAC']:,.0f}")
+    print(f"budget mode: {R['mode']}")
     print(f"unmatched elements: {len(R['unmatched'])}" + (f" -> {R['unmatched'][:10]}" if R["unmatched"] else ""))
     print("rates used:")
     for desc, l in R["used"].items():
@@ -434,7 +497,12 @@ def main():
         print("MISSING:", m)
     s_act = sum(x["bc"] for x in R["rows"])
     s_el = sum(e["bc"] for e in R["E"].values())
-    if abs(s_act - s_el) > 1:
+    if R["mode"] == "activity":
+        linked = {t_ for l in feed["elements"].values() for t_ in l["tasks"]}
+        s_lk = sum(x["bc"] for x in R["rows"] if x["code"] in linked)
+        print(f"budget on model elements {s_el:,.0f} = linked activities {s_lk:,.0f}; "
+              f"activity-only scope {s_act - s_lk:,.0f}")
+    elif abs(s_act - s_el) > 1:
         print(f"CHECK: activity budget {s_act:,.2f} != element budget {s_el:,.2f} (elements without activity?)")
 
 

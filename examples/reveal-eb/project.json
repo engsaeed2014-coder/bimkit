@@ -1,0 +1,121 @@
+{
+ "project": {
+  "name": "REVEAL EB",
+  "name_ar": "ريفيل · بلوك EB",
+  "subtitle": "REVEAL Residential Compound · Al-Obour · Structure + Finishing",
+  "code": "RVL",
+  "short_name": "RVL-EB",
+  "currency": "EGP",
+  "file_prefix": "REVEAL_EB"
+ },
+ "inputs": {
+  "data": "data.json",
+  "activities": "activities.json",
+  "links": "links.json",
+  "update": null,
+  "rates": null,
+  "cost_report": null
+ },
+ "calendar": {
+  "name": "6-Day Workweek (Sat-Thu)",
+  "off_weekdays": [
+   4
+  ],
+  "holidays": [],
+  "hours_per_day": 8
+ },
+ "schedule": {
+  "start": null,
+  "contract_end": null,
+  "fnd_floor": "FND",
+  "floors": [
+   "SOG",
+   "BM",
+   "GF",
+   "FF",
+   "SF",
+   "TF",
+   "4F",
+   "5F",
+   "RF"
+  ],
+  "floor_names_ar": {
+   "FND": "الأساسات",
+   "SOG": "أرضية البدروم",
+   "BM": "البدروم",
+   "GF": "الأرضي",
+   "FF": "الأول",
+   "SF": "الثاني",
+   "TF": "الثالث",
+   "4F": "الرابع",
+   "5F": "الخامس",
+   "RF": "السطح"
+  },
+  "zones": [
+   {
+    "code": "EB1",
+    "name": "Building EB1",
+    "name_ar": "عمارة EB1"
+   },
+   {
+    "code": "EB2",
+    "name": "Building EB2",
+    "name_ar": "عمارة EB2"
+   },
+   {
+    "code": "EB3",
+    "name": "Building EB3",
+    "name_ar": "عمارة EB3"
+   },
+   {
+    "code": "EB4",
+    "name": "Building EB4",
+    "name_ar": "عمارة EB4"
+   },
+   {
+    "code": "EB5",
+    "name": "Building EB5",
+    "name_ar": "عمارة EB5"
+   },
+   {
+    "code": "EB6",
+    "name": "Building EB6",
+    "name_ar": "عمارة EB6"
+   }
+  ],
+  "groups": {
+   "FND": "FND",
+   "TIE": "FND",
+   "SLB": "SLB",
+   "BEAM": "SLB",
+   "STR": "SLB",
+   "COL": "VERT",
+   "WAL": "VERT",
+   "BLK": "FIN",
+   "FAC": "FIN",
+   "FAC2": "FIN",
+   "WIN": "FIN",
+   "RAIL": "FIN",
+   "STL": "FIN"
+  },
+  "source_note": "Approved Master master-v03 (REVEAL-Compound/-REVEAL-Schedule-Control), sheet Master Schedule موحد, Area EB; superseded rows excluded",
+  "steps": {},
+  "crane": {
+   "enabled": false
+  }
+ },
+ "resources": {},
+ "cost": {
+  "currency": "EGP",
+  "rules": [],
+  "budget_note": "Budget = approved Master master-v03 cost loading per activity (Qty x Budget Rate from the EB BOQ and the Residential Finishing BOQ; BOQ rates include the 25% margin) — chosen by Saeed"
+ },
+ "viewer": {
+  "offset": [
+   0,
+   0
+  ],
+  "rings_floor": "GF",
+  "pad_days": 3
+ }
+}
