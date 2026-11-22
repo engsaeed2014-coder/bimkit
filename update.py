@@ -28,6 +28,18 @@ def run(P, prog, sheet=None, data_date=None, keep_sheet=False, assume=False):
     if sheet:
         sdd, rows = progxlsx.read_update(P, sheet)
         dd = dd or sdd
+    # actual dates may start before the baseline: start the calendar at the earliest date and re-index
+    early = [r["start"] for r in rows.values() if r.get("start")]
+    if early and min(early) < cal.start:
+        cal = Calendar(min(early), C.get("off_weekdays", [4]), C.get("holidays", []), C.get("name"))
+        for a in acts:
+            a["es"] = cal.index(a["baseline_start"])
+            if a["type"] == "task":
+                a["ef"] = max(cal.index(a["baseline_finish"], "prev"), a["es"]) + 1
+            elif a["type"] == "finish_milestone":
+                a["es"] = a["ef"] = cal.index(a["baseline_finish"], "prev") + 1
+            else:
+                a["ef"] = a["es"]
     dd = dd or cal.start
     ddi = cal.index(dd, "prev") if dd >= cal.start else -1
     tr = progxlsx.labour_trades(P)
