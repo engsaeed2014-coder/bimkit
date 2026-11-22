@@ -49,7 +49,7 @@ ul.al{list-style:none;margin:0;padding:0;font-size:12px}ul.al li{display:grid;gr
 <div id="top"><div class="chip" id="datechip">تاريخ البيانات · <b id="dtxt">–</b></div><div class="chip" id="c_work">العمالة: <b id="c_w">–</b></div><div class="chip" id="c_prog">التقدم: <b id="c_p">–</b></div><div class="chip" id="c_act">الأنشطة الجارية: <b id="c_a">–</b></div></div>
 <div id="tools"><button data-v="both" class="on">الاتنين</button><button data-v="upd">الفعلي والمتوقع</button><button data-v="base">المخطط</button><button data-v="top">من فوق</button><button id="tg_var" class="on">تلوين الفروقات</button><button id="tg_wk" class="on">العمالة</button><select id="cutsel" aria-label="قطع دور"><option value="">قطع دور: بدون</option></select></div>
 <div id="legend"></div>
-<div class="chip" id="bar"><button id="play">▶ تشغيل</button><select id="spd" aria-label="السرعة"><option value="0.5">×0.5</option><option value="1" selected>×1</option><option value="2">×2</option><option value="4">×4</option></select><button id="gdd">تاريخ المتابعة</button><input id="sl" type="range" min="0" max="300" step="1" value="0" aria-label="التاريخ"><span id="dlab" style="min-width:110px;text-align:center;font-family:var(--num)"></span></div></div>
+<div class="chip" id="bar"><button id="play">▶ تشغيل</button><select id="spd" aria-label="السرعة"><option value="0.5">×0.5</option><option value="1" selected>×1</option><option value="2">×2</option><option value="4">×4</option></select><select id="stp" aria-label="الخطوة"><option value="m" selected>شهري</option><option value="w">أسبوعي</option><option value="d">يومي</option></select><button id="gdd">تاريخ المتابعة</button><input id="sl" type="range" min="0" max="300" step="1" value="0" aria-label="التاريخ"><span id="dlab" style="min-width:110px;text-align:center;font-family:var(--num)"></span></div></div>
 <aside>
 <header><h1 id="h1t">4D</h1><p id="h1p">البيز لاين والفعلي والمتوقع، العمالة والونش، على نفس المجسم</p>
 <div id="xio5" class="v5" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button id="xi5" class="xb">⬆ استيراد كوست ريبورت</button><button id="xe5" class="xb">⬇ تصدير كوست ريبورت</button><button id="xr5" class="xb">↺ رجوع للأصل</button><input id="xf5" type="file" accept=".xlsx" hidden></div>
@@ -353,10 +353,10 @@ function updateUI(d,st,fl0,fl1){actUI(d);if(MODE5&&window.__cost5)setTimeout(()=
 const sl=$('#sl');sl.max=MAXCD;let cd=Math.round((dms[DD]-T0)/DAY),playing=false,last=0,acc=0;
 FL.forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent='قطع عند '+FAR[f];$('#cutsel').appendChild(o)});
 $('#cutsel').onchange=e=>{setCut(e.target.value||null);apply(idxAt(cd))};
-function setCD(v){cd=Math.max(0,Math.min(MAXCD,Math.round(v)));sl.value=cd;const d=idxAt(cd);$('#dlab').textContent=fmt(T0+cd*DAY);apply(d)}
+const STP=()=>$('#stp').value;function monthEnd(v,add){const x=new Date(T0+v*DAY);const e=Date.UTC(x.getUTCFullYear(),x.getUTCMonth()+1+(add||0),0);return Math.round((e-T0)/DAY)}function snap(v){const s=STP();if(s==='m')return monthEnd(v);if(s==='w')return Math.round(v/7)*7;return v}const fmtM=ms=>new Date(ms).toLocaleDateString('ar-EG-u-nu-latn',{month:'long',year:'numeric',timeZone:'UTC'});function setCD(v,exact){cd=Math.max(0,Math.min(MAXCD,Math.round(exact?v:snap(v))));sl.value=cd;const d=idxAt(cd);$('#dlab').textContent=(STP()==='m'&&!exact)?fmtM(T0+cd*DAY):fmt(T0+cd*DAY);apply(d)}
 sl.oninput=()=>setCD(+sl.value);
 $('#play').onclick=e=>{playing=!playing;e.target.textContent=playing?'⏸ إيقاف':'▶ تشغيل';e.target.classList.toggle('on',playing);if(playing&&cd>=MAXCD)setCD(0)};
-$('#gdd').onclick=()=>setCD((dms[DD]-T0)/DAY);
+$('#gdd').onclick=()=>setCD((dms[DD]-T0)/DAY,true);$('#stp').onchange=()=>setCD(cd);
 $('#tg_var').onclick=e=>{showVar=!showVar;e.target.classList.toggle('on',showVar);apply(idxAt(cd))};
 $('#tg_wk').onclick=e=>{showWk=!showWk;e.target.classList.toggle('on',showWk)};
 let tw=null;function fly(p,t,ms=900){const p0=cam.position.clone(),t0=ctl.target.clone(),s=performance.now();tw=n=>{const k=Math.min(1,(n-s)/ms),e=k*k*(3-2*k);cam.position.lerpVectors(p0,p,e);ctl.target.lerpVectors(t0,t,e);if(k>=1)tw=null}}
@@ -373,7 +373,7 @@ setTimeout(()=>{label('الفعلي والمتوقع (Update)',CX,RZ,10);label('
 // loop
 let tgt=[null,null],tgtT=0;
 function loop(t){requestAnimationFrame(loop);const dt=Math.min(.1,(t-last)/1000||0);last=t;
- if(playing){acc+=dt*(+$('#spd').value)*6;while(acc>=1){acc-=1;if(cd>=MAXCD){playing=false;$('#play').textContent='▶ تشغيل';$('#play').classList.remove('on');break}setCD(cd+1)}}
+ if(playing){const s_=STP();acc+=dt*(+$('#spd').value)*(s_==='d'?6:s_==='w'?3:1.2);while(acc>=1){acc-=1;if(cd>=MAXCD){playing=false;$('#play').textContent='▶ تشغيل';$('#play').classList.remove('on');break}setCD(s_==='d'?cd+1:s_==='w'?cd+7:monthEnd(cd,1))}}
  if(tw)tw(t);ctl.update();
  cars.forEach(c=>{c.x+=c.v*dt;if(c.x>170)c.x=-120;if(c.x<-120)c.x=170;c.g.position.x=c.x});
  const d=idxAt(cd);
@@ -384,7 +384,7 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.1,(t-last)/1000|
  animWorkers(t);pumps.forEach((p,b)=>updatePump(p,b,t,dt));R.render(scene,cam)}
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();updateUI(idxAt(cd),null,null,null)}
 new ResizeObserver(()=>{resize()}).observe(stage);
-setCD((dms[DD]-T0)/DAY);resize();loop(0);if(!MODE5)$('#h1t').textContent=C.name_ar+' · 4D';if(MODE5){$('#h1t').textContent=C.name_ar+' · 5D';$('#h1p').textContent='تكلفة المخطط مقابل الفعلي على نفس المجسم، بتاريخ البيانات';setTimeout(()=>__cost5.draw(idxAt(cd)),1000)}
+setCD((dms[DD]-T0)/DAY,true);resize();loop(0);if(!MODE5)$('#h1t').textContent=C.name_ar+' · 4D';if(MODE5){$('#h1t').textContent=C.name_ar+' · 5D';$('#h1p').textContent='تكلفة المخطط مقابل الفعلي على نفس المجسم، بتاريخ البيانات';setTimeout(()=>__cost5.draw(idxAt(cd)),1000)}
 
 // ---------- Excel import / export ----------
 const XTR=Object.keys(C.trades);
