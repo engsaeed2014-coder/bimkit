@@ -65,8 +65,8 @@ ul.al{list-style:none;margin:0;padding:0;font-size:12px}ul.al li{display:grid;gr
 <section class="blk v4"><div class="kpis" id="kpis"></div></section>
 <section class="blk v4"><h3>الجدول الشهري: التقدم والعمالة</h3><div style="overflow-x:auto;max-height:260px;overflow-y:auto" id="mt4"></div></section>
 <section class="blk v4"><h3>منحنى التقدم: المخطط مقابل الفعلي (وزن بحجم الخرسانة)</h3><canvas class="ch" id="sc" style="height:170px"></canvas><div class="leg"><span><i class="sw" style="background:var(--blu)"></i>المخطط</span><span><i class="sw" style="background:var(--acc)"></i>الفعلي</span><span><i class="sw" style="background:var(--acc);opacity:.45"></i>المتوقع</span></div></section>
-<section class="blk v4"><h3>العمالة اليومية حسب التخصص (الفعلي) والمخطط بخط أبيض</h3><canvas class="ch" id="lc" style="height:170px"></canvas><div class="leg" id="llg"></div></section>
-<section class="blk v4"><h3>العمالة حسب التخصص اليوم: الفعلي / المخطط</h3><div id="trt"></div></section>
+<section class="blk v4"><h3>متوسط العمالة الشهري حسب التخصص (الفعلي) والمخطط بخط متقطع</h3><canvas class="ch" id="lc" style="height:170px"></canvas><div class="leg" id="llg"></div></section>
+<section class="blk v4"><h3>متوسط العمالة حسب التخصص في الشهر: الفعلي / المخطط</h3><div id="trt"></div></section>
 <section class="blk v4"><h3>الأنشطة: منفذ / جاري / لم يبدأ</h3><div id="asum"></div><div id="aflt" style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0"></div><div id="alist" style="max-height:360px;overflow:auto"></div></section>
 <section class="blk v4"><h3>مصادر التأخير (من أين جه؟)</h3><div id="dsrc"></div></section>
 <section class="blk v4"><h3>تقدم كل دور: المخطط (أزرق) والفعلي (أصفر)</h3><div class="fl" id="fl"></div></section>
@@ -311,13 +311,7 @@ function sCurve(d){const[g,w,h]=setup($('#sc'));const P={l:30,r:8,t:8,b:20},X=i=
  g.strokeStyle=css('--mute');g.setLineDash([3,3]);g.beginPath();g.moveTo(X(DD),P.t);g.lineTo(X(DD),h-P.b);g.stroke();g.setLineDash([]);
  g.strokeStyle=css('--fg');g.lineWidth=1.5;g.beginPath();g.moveTo(X(d),P.t);g.lineTo(X(d),h-P.b);g.stroke();
  [[cum[1][d],css('--blu')],[cum[0][d],css('--acc')]].forEach(([v,c])=>{g.fillStyle=c;g.beginPath();g.arc(X(d),Y(v),4,0,7);g.fill()})}
-function lChart(d){const[g,w,h]=setup($('#lc'));const P={l:30,r:8,t:8,b:20};const mx=Math.max(...D.up,...D.pl)*1.1,bw=(w-P.l-P.r)/ND,Y=v=>h-P.b-(h-P.t-P.b)*v/mx;
- g.font='10px sans-serif';g.fillStyle=css('--mute');g.strokeStyle=css('--line');
- for(let v=0;v<=mx;v+=25){g.beginPath();g.moveTo(P.l,Y(v));g.lineTo(w-P.r,Y(v));g.stroke();g.textAlign='right';g.fillText(v,P.l-4,Y(v)+3)}
- for(let i=0;i<ND;i++){let acc=0;g.globalAlpha=i>DD?.45:1;TR.forEach(k=>{const v=D.upt[k][i];if(!v)return;g.fillStyle=TC2[k];g.fillRect(P.l+i*bw,Y(acc+v),Math.max(bw-.3,.6),Y(acc)-Y(acc+v));acc+=v});g.globalAlpha=1}
- g.strokeStyle=css('--fg');g.lineWidth=1.3;g.setLineDash([3,2]);g.beginPath();for(let i=0;i<ND;i++){const x=P.l+(i+.5)*bw;i?g.lineTo(x,Y(D.pl[i])):g.moveTo(x,Y(D.pl[i]))}g.stroke();g.setLineDash([]);
- g.strokeStyle=css('--acc');g.lineWidth=1.5;g.beginPath();g.moveTo(P.l+d*bw,P.t);g.lineTo(P.l+d*bw,h-P.b);g.stroke();
- for(let i=0;i<ND;i+=Math.round(ND/6)){g.fillStyle=css('--mute');g.textAlign='center';g.fillText(new Date(dms[i]).toLocaleDateString('en-GB',{month:'short',timeZone:'UTC'}),P.l+i*bw,h-6)}}
+function lChart(d){const[g,w,h]=setup($('#lc'));const P={l:30,r:8,t:8,b:20};const NM=MONS.length;const ua=MONS.map(m=>{const o={};TR.forEach(k=>o[k]=avgL(D.upt[k],m));return o}),pa=MONS.map(m=>avgL(D.pl,m)),ut=ua.map(o=>TR.reduce((s,k)=>s+o[k],0));const mx=Math.max(1,...ut,...pa)*1.1,bw=(w-P.l-P.r)/NM,Y=v=>h-P.b-(h-P.t-P.b)*v/mx,step=mx>200?100:mx>80?25:mx>20?10:5;g.font='10px sans-serif';g.fillStyle=css('--mute');g.strokeStyle=css('--line');for(let v=0;v<=mx;v+=step){g.beginPath();g.moveTo(P.l,Y(v));g.lineTo(w-P.r,Y(v));g.stroke();g.textAlign='right';g.fillText(v,P.l-4,Y(v)+3)}const cur=monOf(d);MONS.forEach((m,i)=>{let acc=0;g.globalAlpha=m.i0>DD?.45:1;TR.forEach(k=>{const v=ua[i][k];if(!v)return;g.fillStyle=TC2[k];g.fillRect(P.l+i*bw+1,Y(acc+v),Math.max(bw-2,1),Y(acc)-Y(acc+v));acc+=v});g.globalAlpha=1;if(m===cur){g.strokeStyle=css('--acc');g.lineWidth=1.5;g.strokeRect(P.l+i*bw+.5,P.t,bw-1,h-P.t-P.b)}});g.strokeStyle=css('--fg');g.lineWidth=1.3;g.setLineDash([3,2]);g.beginPath();pa.forEach((v,i)=>{const x=P.l+(i+.5)*bw;i?g.lineTo(x,Y(v)):g.moveTo(x,Y(v))});g.stroke();g.setLineDash([]);const ev=Math.max(1,Math.round(NM/8));MONS.forEach((m,i)=>{if(i%ev)return;g.fillStyle=css('--mute');g.textAlign='center';g.fillText(MNAME[+m.k.slice(5,7)-1].slice(0,3)+' '+m.k.slice(2,4),P.l+(i+.5)*bw,h-6)})}
 const fl=$('#fl');fl.innerHTML=FL.map(f=>`<span>${FAR[f]}</span><div class="bars"><i class="b" id="fb_${f}"></i><i class="u" id="fu_${f}"></i></div><span class="n" id="fn_${f}"></span><i class="d" id="fd_${f}"></i>`).join('');
 
 // ---------- activity status & delay sources ----------
@@ -341,7 +335,7 @@ function monthTable4(d){const cur=monOf(d);const r1=v=>v.toFixed(1);let h='<tabl
 function updateUI(d,st,fl0,fl1){actUI(d);if(MODE5&&window.__cost5)setTimeout(()=>__cost5.draw(d),0);
  const pb=cum[1][d],pu=cum[0][d],spi=pb>0?pu/pb:1,dd=d>DD;
  $('#dtxt').textContent=fmt(dms[Math.min(d,ND-1)]);
- const wk0=D.pl[d],wk1=D.up[d];$('#c_w').textContent=`${Math.round(wk1)} فعلي${dd?' (متوقع)':''} / ${Math.round(wk0)} مخطط`;
+ const wk0=D.pl[d],wk1=D.up[d],Mc=monOf(d);$('#c_w').textContent=`${Math.round(avgL(D.up,Mc))} فعلي${dd?' (متوقع)':''} / ${Math.round(avgL(D.pl,Mc))} مخطط · متوسط ${monLab(Mc)}`;
  $('#c_p').textContent=`${pu.toFixed(1)}% فعلي / ${pb.toFixed(1)}% مخطط`;
  const act=Object.values(D.acts).filter(a=>a.t==='task'&&d>=a.a[2]&&d<=a.a[3]);$('#c_a').textContent=act.length;
  const pk0=Math.max(...D.pl),pk1=Math.max(...D.up);
@@ -352,7 +346,7 @@ function updateUI(d,st,fl0,fl1){actUI(d);if(MODE5&&window.__cost5)setTimeout(()=
  FL.forEach(f=>{const s=FSTAT[f];$('#fb_'+f).style.width=s.b+'%';$('#fu_'+f).style.width=s.u+'%';$('#fn_'+f).textContent=`${s.u.toFixed(0)}/${s.b.toFixed(0)}`;$('#fd_'+f).style.background=s.diff<-10?css('--red'):s.diff>10?css('--grn'):'transparent'});
  $('#al').innerHTML=act.slice(0,9).map(a=>{const p=Math.round(frac(a.a,0,d)*100),pb=Math.round(frac(a.a,1,d)*100),df=p-pb;return `<li><span>${a.n}</span><b style="font-family:var(--num)">${p}%</b><small>المخطط ${pb}%</small><small class="${df<-10?'bad':df>10?'good':''}">${df<-10?'متأخر':df>10?'سابق':'مطابق'}</small></li>`}).join('')||'<li><span>لا توجد أنشطة جارية</span></li>';
  {const cnt=[{},{}];[0,1].forEach(b=>workers[b].forEach(w=>cnt[b][w.k]=(cnt[b][w.k]||0)+1));
- $('#trt').innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse">'+Object.keys(VEST).map(k=>`<tr><td><i class="sw" style="background:#${VEST[k].toString(16).padStart(6,'0')}"></i> ${D.res[k]||k}</td><td style="text-align:center;font-family:var(--num)"><b>${cnt[0][k]||0}</b> / ${cnt[1][k]||0}</td></tr>`).join('')+'</table>'}
+ $('#trt').innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse">'+Object.keys(VEST).map(k=>`<tr><td><i class="sw" style="background:#${VEST[k].toString(16).padStart(6,'0')}"></i> ${D.res[k]||k}</td><td style="text-align:center;font-family:var(--num)"><b>${Math.round(avgL(D.upt[k]||[],M_))}</b> / ${Math.round(avgL(D.plt[k]||[],M_))}</td></tr>`).join('')+'</table>'}
  sCurve(d);lChart(d)}
 // ---------- UI ----------
 const sl=$('#sl');sl.max=MAXCD;let cd=Math.round((dms[DD]-T0)/DAY),playing=false,last=0,acc=0;
