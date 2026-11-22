@@ -1,0 +1,261 @@
+{
+ "_note": "Which Master activities each model element carries, in addition to (or instead of) the reveal-4d mapping. Activity names are matched on the text after the last ' · ' (endswith). floor: same = activity on the element's floor; below = activity on the floor above the element (floor finishes sit on the slab under them); building = building-level activity (no floor); group = group-level activity (EB-A / EB-B). Weights = activity budget share on the element.",
+ "split": {
+  "BlockWall": {
+   "by": "w",
+   "limit": 0.2,
+   "low": "BlockWall12",
+   "high": "BlockWall25"
+  }
+ },
+ "rules": [
+  {
+   "cat": "BlockWall12",
+   "replace": true,
+   "floor": "same",
+   "names": [
+    "Block Work - 12cm",
+    "Beacons",
+    "Electrical Prep",
+    "بياض داخلي للوحدات",
+    "بياض حوائط المناطق العامة",
+    "دهانات حوائط المناطق العامة",
+    "أبواب الشقق المصفحة"
+   ]
+  },
+  {
+   "cat": "BlockWall25",
+   "replace": true,
+   "floor": "same",
+   "names": [
+    "Block Work - 25cm",
+    "Beacons",
+    "Electrical Prep",
+    "بياض داخلي للوحدات",
+    "بياض حوائط المناطق العامة",
+    "دهانات حوائط المناطق العامة"
+   ]
+  },
+  {
+   "cat": "BlockWall25",
+   "floor": "building",
+   "names": [
+    "بياض المناور",
+    "دهان أكريليك للمناور"
+   ]
+  },
+  {
+   "cat": "Slab",
+   "floor": "same",
+   "names": [
+    "بياض أسقف المناطق العامة",
+    "دهانات أسقف المناطق العامة",
+    "Gypsum Board بالمداخل والطرقات",
+    "سيراميك الأسطح العلوية",
+    "سيراميك الأسطح النهائية",
+    "فواصل تمدد أفقية بالسطح",
+    "سلم صيانة معدني بحاري"
+   ]
+  },
+  {
+   "cat": "Slab",
+   "floor": "below",
+   "names": [
+    "رخام الطرقات",
+    "رخام تراسات الدور الأرضي",
+    "رخام مداخل الدور الأرضي"
+   ]
+  },
+  {
+   "cat": "Stair",
+   "floor": "same",
+   "names": [
+    "رخام بسطات السلالم",
+    "درابزين/هاندريل السلالم",
+    "جرانيت درج المدخل الرئيسي",
+    "حليات معدنية بجوار المداخل"
+   ]
+  },
+  {
+   "cat": "FacadeRAL9010",
+   "replace": true,
+   "floor": "building",
+   "names": [
+    "بياض الواجهات والبلكونات",
+    "تشطيب مونة أسمنتية ملونة للواجهات",
+    "عراميس الواجهات",
+    "فواصل تمدد رأسية بالواجهات",
+    "كسوة بازلت",
+    "رقم العمارة"
+   ]
+  },
+  {
+   "cat": "FacadeRAL7035",
+   "replace": true,
+   "floor": "building",
+   "names": [
+    "بياض الواجهات والبلكونات",
+    "تشطيب مونة أسمنتية ملونة للواجهات",
+    "عراميس الواجهات",
+    "فواصل تمدد رأسية بالواجهات",
+    "كسوة بازلت"
+   ]
+  },
+  {
+   "cat": "Window",
+   "replace": true,
+   "floor": "building",
+   "names": [
+    "أعمال الألومنيوم 14-1-1",
+    "أعمال الألومنيوم 14-1-2",
+    "أعمال الألومنيوم 14-1-3",
+    "أعمال الألومنيوم 14-1-4",
+    "أعمال الألومنيوم 14-1-5",
+    "أعمال الألومنيوم 14-1-6",
+    "أعمال الألومنيوم 14-1-7"
+   ]
+  },
+  {
+   "cat": "WindowFrame",
+   "replace": true,
+   "floor": "building",
+   "names": [
+    "أعمال الألومنيوم 14-1-1",
+    "أعمال الألومنيوم 14-1-2",
+    "أعمال الألومنيوم 14-1-3",
+    "أعمال الألومنيوم 14-1-4",
+    "أعمال الألومنيوم 14-1-5",
+    "أعمال الألومنيوم 14-1-6",
+    "أعمال الألومنيوم 14-1-7"
+   ]
+  },
+  {
+   "cat": "SteelBox",
+   "replace": true,
+   "floor": "building",
+   "names": [
+    "حليات معدنية للواجهات",
+    "حوامل التكييف"
+   ]
+  },
+  {
+   "cat": "Column",
+   "lv": "BM",
+   "floor": "same",
+   "names": [
+    "بياض حوائط/أعمدة/كمرات الجراج",
+    "دهانات حوائط/أعمدة/كمرات الجراج"
+   ]
+  },
+  {
+   "cat": "Beam",
+   "lv": "BM",
+   "floor": "same",
+   "names": [
+    "بياض حوائط/أعمدة/كمرات الجراج",
+    "دهانات حوائط/أعمدة/كمرات الجراج"
+   ]
+  },
+  {
+   "cat": "Slab",
+   "lv": "BM",
+   "floor": "same",
+   "names": [
+    "بياض أسقف الجراج",
+    "دهانات أسقف الجراج",
+    "فواصل تمدد أفقية بالبدروم"
+   ]
+  },
+  {
+   "cat": "Slab",
+   "lv": "SOG",
+   "floor_as": "BM",
+   "floor": "same",
+   "names": [
+    "Internal Backfill",
+    "SOG",
+    "عزل أسمنتي لأرضيات دكة البدروم",
+    "سيراميك غرف القمامة",
+    "سيراميك غرف الكهرباء",
+    "أبواب غرف القمامة",
+    "أبواب غرف الكهرباء"
+   ]
+  },
+  {
+   "cat": "RetainingWall",
+   "replace": true,
+   "floor_as": "BM",
+   "floor": "same",
+   "names": [
+    "Retaining Wall",
+    "Waterproofing",
+    "External Backfill",
+    "فواصل تمدد رأسية بالبدروم"
+   ]
+  },
+  {
+   "cat": "SoilLayer",
+   "replace": true,
+   "floor": "group",
+   "names": [
+    "Excavation - Normal Soil",
+    "Excavation - Hard Soil",
+    "Additional Excavation - Rocky Soil",
+    "Soil Replacement - 1:1",
+    "Soil Replacement - 1:1:2",
+    "Plain Concrete (PCC)",
+    "Backfill - Sand Supplied From Inside Site",
+    "Backfill - Sand Supplied From Outside Site"
+   ]
+  },
+  {
+   "cat": "Stair",
+   "floor": "building",
+   "names": [
+    "Elevator",
+    "Garbage Chute",
+    "جرانيت السلالم الخارجية"
+   ]
+  },
+  {
+   "cat": "Stair",
+   "lv": "GF",
+   "floor": "same",
+   "names": [
+    "هاندريل مداخل العمارات",
+    "مرايات المداخل"
+   ]
+  },
+  {
+   "cat": "Slab",
+   "lv": "BM",
+   "floor": "building",
+   "names": [
+    "عزل أسمنتي لسقف البدروم خارج حدود المبنى",
+    "عزل حراري لسقف البدروم خارج حدود المبنى"
+   ]
+  },
+  {
+   "cat": "BlockWall25",
+   "lv": "RF",
+   "floor": "same",
+   "names": [
+    "RF Block Work - 12cm"
+   ]
+  }
+ ],
+ "assumed_geometry": {
+  "RetainingWall": {
+   "from": "BM slab outline of the block, outer edge",
+   "thickness_m": 0.3,
+   "z0_from": "SOG slab top",
+   "z1_from": "BM slab bottom"
+  },
+  "SoilLayer": {
+   "from": "footings of each building, convex hull + 1.0 m",
+   "depth_m": 0.5,
+   "below": "lowest footing"
+  }
+ },
+ "_gaps": "Left at activity level (no geometry in reveal-4d): Walkway Slab - المشايات, مطبات صناعية"
+}

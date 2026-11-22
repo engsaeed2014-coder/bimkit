@@ -237,21 +237,38 @@ def from_activities(P, path):
 
 
 def links_from_file(acts, data, path):
-    """Element -> activity links supplied by an adapter: {element_id: [codes]} (or a single code)."""
+    """Element -> activity links supplied by an adapter.
+
+    {element_id: code} | {element_id: [codes]} | {element_id: {"tasks": [codes], "weights": [w, ...]}}.
+    Weights are the share of the element's progress carried by each activity (equal when omitted).
+    """
     raw = load_json(path)
     A = {a["code"]: a for a in acts}
     links, orphans_el, missing = {}, [], set()
     for el in data["elements"]:
         v = raw.get(el["id"])
-        tasks = [v] if isinstance(v, str) else list(v or [])
+        wts = None
+        if isinstance(v, dict):
+            tasks, wts = list(v.get("tasks") or []), v.get("weights")
+        else:
+            tasks = [v] if isinstance(v, str) else list(v or [])
         bad = [c for c in tasks if c not in A]
         missing.update(bad)
-        tasks = [c for c in tasks if c in A]
+        keep = [i for i, c in enumerate(tasks) if c in A]
+        tasks = [tasks[i] for i in keep]
         if not tasks:
             orphans_el.append(el["id"])
             continue
-        links[el["id"]] = dict(first=tasks[0], pour=tasks[-1], tasks=tasks, group=f"W{len(tasks)}",
-                               zone=el.get("zone") or A[tasks[0]].get("wing"))
+        if wts:
+            wts = [float(wts[i]) for i in keep]
+            s = sum(wts)
+            wts = [w / s for w in wts] if s > 0 else None
+        rec = dict(first=tasks[0], pour=tasks[-1], tasks=tasks, group=f"W{len(tasks)}",
+                   zone=el.get("zone") or A[tasks[0]].get("wing"))
+        if wts:
+            rec["weights"] = [round(w, 6) for w in wts]
+            rec["group"] = "E:" + el["id"]
+        links[el["id"]] = rec
     used = {t for l in links.values() for t in l["tasks"]}
     orphans_act = [a["code"] for a in acts if a["type"] == "task" and a["code"] not in used]
     if missing:

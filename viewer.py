@@ -102,7 +102,7 @@ def build_sd(P, data, feed, cost):
         gname = l.get("group")
         if gname and gname not in weights:
             n = len(l["tasks"])
-            weights[gname] = [round(1 / n, 6)] * n
+            weights[gname] = l.get("weights") or [round(1 / n, 6)] * n
     kind = {k: v.get("part") for k, v in S.get("steps", {}).items() if v.get("part")}
     for a in feed["activities"]:
         if a.get("step") and a["step"] not in kind:
@@ -110,6 +110,23 @@ def build_sd(P, data, feed, cost):
     rings = rings_for(P, data, off)
     xs = [p[0] for r in rings for p in r] or [0]
     ys = [p[1] for r in rings for p in r] or [0]
+    # the 4D stage puts update / baseline side by side along x: turn a block that is long in y by 90 degrees
+    rot = V.get("rotate")
+    if rot is None:
+        rot = (max(ys) - min(ys)) > 2 * (max(xs) - min(xs))
+    if rot:
+        x1_, y0_ = max(xs), min(ys)
+        rt = lambda pt: [round(pt[1] - y0_, 2), round(x1_ - pt[0], 2)]
+        trl = lambda pts: [rt(q) for q in pts]
+        rings = [trl(r) for r in rings]
+        for e in els:
+            e["x"], e["y"] = rt([e["x"], e["y"]])
+            e["g"]["o"] = trl(e["g"]["o"])
+            e["g"]["h"] = [trl(h) for h in e["g"]["h"]]
+            if "p" in e["g"]:
+                e["g"]["p"] = [[trl(o), [trl(h) for h in hs], z0, z1] for o, hs, z0, z1 in e["g"]["p"]]
+        xs = [p[0] for r in rings for p in r] or [0]
+        ys = [p[1] for r in rings for p in r] or [0]
     floors = [S["fnd_floor"]] + [f for f in S["floors"] if f != S["fnd_floor"]]
     lv = data["levels"]
     below = {}
@@ -122,7 +139,8 @@ def build_sd(P, data, feed, cost):
                kind=kind,
                trades={k: P["resources"][k].get("color") or "#cccccc" for k in tr}, zones=feed["zones"],
                bbox=[min(xs), max(xs), min(ys), max(ys)], off_weekdays=P["calendar"].get("off_weekdays", [4]),
-               cx=cr.get("x", (min(xs) + max(xs)) / 2), crane_on=bool(cr.get("enabled")),
+               cx=cr.get("x", (min(xs) + max(xs)) / 2) if not rot else (min(xs) + max(xs)) / 2,
+               crane_on=bool(cr.get("enabled")), rotated=bool(rot),
                currency=P["cost"].get("currency", P["project"].get("currency", "EGP")), below=below)
     dd = feed["data_date"]
     ddi = di.get(dd)
