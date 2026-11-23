@@ -8,6 +8,7 @@ Uses data.json (3D), out/feed.json (4D) and out/cost.json (5D, optional — with
 """
 import argparse
 import json
+import math
 import os
 import sys
 
@@ -127,6 +128,36 @@ def build_sd(P, data, feed, cost):
                 e["g"]["p"] = [[trl(o), [trl(h) for h in hs], z0, z1] for o, hs, z0, z1 in e["g"]["p"]]
         xs = [p[0] for r in rings for p in r] or [0]
         ys = [p[1] for r in rings for p in r] or [0]
+    stands = []
+    for s in data.get("stands", []):
+        q, ang = [s["x"] + off[0], s["y"] + off[1]], s.get("a", 0)
+        if rot:
+            q, ang = rt(q), ang - math.pi / 2
+        stands.append(dict(n=s.get("name", ""), l=s.get("label") or "PUMP " + s.get("name", ""), k=s.get("kind", "pump"),
+                           x=round(q[0], 2), y=round(q[1], 2), z=s.get("z", 0), a=round(ang, 3), f=s.get("f"), t=s.get("t"),
+                           c=s.get("c", []), p=s.get("p", []), b=s.get("serves") or s.get("name", "").split("/")))
+    pits = []
+    for p_ in data.get("pits", []):
+        tq = (lambda pts: [rt([x + off[0], y + off[1]]) for x, y in pts]) if rot else (lambda pts: [[round(x + off[0], 2), round(y + off[1], 2)] for x, y in pts])
+        pits.append(dict(id=p_["id"], r=[tq(r) for r in p_["r"]], zb=p_["zb"], zf=p_["zf"], d=p_["d"],
+                         site=p_.get("site_level", 0), s=[dict(o=tq(s["o"]), h=[tq(h) for h in s["h"]]) for s in p_["s"]],
+                         e=p_["e"], rp=p_["rp"], c=p_["c"], o=p_["o"]))
+    terrain = None
+    if data.get("terrain"):
+        tr_ = data["terrain"]            # m: grid (gx, gy) -> stage (X, Y)
+        m = [0, 1, off[1] - y0_, -1, 0, x1_ - off[0]] if rot else [1, 0, off[0], 0, 1, off[1]]
+        # keep the part of the grid around the model: the update and baseline copies stand side by side and must not overlap
+        st_, nx_, ny_ = tr_["step"], tr_["nx"], tr_["ny"]
+        X = lambda gx, gy: m[0] * gx + m[1] * gy + m[2]
+        Y = lambda gx, gy: m[3] * gx + m[4] * gy + m[5]
+        ok = lambda j, i: (min(xs) - 6 <= X(tr_["x0"] + j * st_, tr_["y0"] + i * st_) <= max(xs) + 6
+                           and min(ys) - 25 <= Y(tr_["x0"] + j * st_, tr_["y0"] + i * st_) <= max(ys) + 25)
+        js = [j for j in range(nx_) if any(ok(j, i) for i in (0, ny_ // 2, ny_ - 1))]
+        is_ = [i for i in range(ny_) if any(ok(j, i) for j in (0, nx_ // 2, nx_ - 1))]
+        j0, j1, i0, i1 = min(js), max(js), min(is_), max(is_)
+        cut = lambda a: [a[i * nx_ + j] for i in range(i0, i1 + 1) for j in range(j0, j1 + 1)]
+        terrain = dict(x0=round(tr_["x0"] + j0 * st_, 2), y0=round(tr_["y0"] + i0 * st_, 2), step=st_, nx=j1 - j0 + 1, ny=i1 - i0 + 1,
+                       z=cut(tr_["z"]), pit=cut(tr_["pit"]), m=m)
     floors = [S["fnd_floor"]] + [f for f in S["floors"] if f != S["fnd_floor"]]
     lv = data["levels"]
     below = {}
@@ -149,7 +180,7 @@ def build_sd(P, data, feed, cost):
         ddi = prior[-1] if prior else 0
     dl = feed["daily"]
     tot = C.get("totals", {})
-    sd = dict(cfg=cfg, rings=rings, dates=dates, acts=acts, els=els, dd=ddi, start=feed["start"],
+    sd = dict(cfg=cfg, rings=rings, stands=stands, pits=pits, terrain=terrain, dates=dates, acts=acts, els=els, dd=ddi, start=feed["start"],
               contract_end=feed.get("contract_end"),
               crane=dict(x=cr.get("x", 0) + off[0], y=round(cr.get("y", 0) + off[1], 2), jib=cr.get("jib_radius_m", 50)),
               levels=data["levels"], top=data["top"], pl=dl["planned_labour"], up=dl["upd_labour"],

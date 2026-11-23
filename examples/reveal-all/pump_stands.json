@@ -1,0 +1,259 @@
+{
+ "note": "Concrete pump stands from the pump standing study (ASSUMED, no site logistics plan issued). x,y in reveal-4d site coordinates = centre of the 20 x 8.5 m stand (pump with full outriggers + mixer); a = truck direction (0 = along x); f/t = period the stand is used (pour dates of the buildings served, Master v04, split by excavation phase); serves = buildings, first listed stand that is free takes the pour.",
+ "stands": [
+  {
+   "name": "EB1-A",
+   "label": "PUMP EB1",
+   "x": 273.8,
+   "y": 191.8,
+   "a": 1.5707963267948966,
+   "f": "2026-10-03",
+   "t": "2027-01-14",
+   "road": "external east street",
+   "serves": [
+    "EB1"
+   ],
+   "note": "EB-A excavation open: 1:1 line from the pit bottom"
+  },
+  {
+   "name": "EB1",
+   "label": "PUMP EB1",
+   "x": 269.4,
+   "y": 191.8,
+   "a": 1.5707963267948966,
+   "f": "2027-01-15",
+   "t": "2027-07-12",
+   "road": "external east street",
+   "serves": [
+    "EB1"
+   ],
+   "note": "2 m off the backfilled basement wall"
+  },
+  {
+   "name": "EB2-A",
+   "label": "PUMP EB2",
+   "x": 273.8,
+   "y": 164.7,
+   "a": 1.5707963267948966,
+   "f": "2026-10-26",
+   "t": "2027-01-14",
+   "road": "external east street",
+   "serves": [
+    "EB2"
+   ],
+   "note": "EB-A excavation open: 1:1 line from the pit bottom"
+  },
+  {
+   "name": "EB2",
+   "label": "PUMP EB2",
+   "x": 269.4,
+   "y": 164.7,
+   "a": 1.5707963267948966,
+   "f": "2027-01-15",
+   "t": "2027-06-14",
+   "road": "external east street",
+   "serves": [
+    "EB2"
+   ],
+   "note": "2 m off the backfilled basement wall"
+  },
+  {
+   "name": "EB3-A",
+   "label": "PUMP EB3",
+   "x": 273.8,
+   "y": 137.4,
+   "a": 1.5707963267948966,
+   "f": "2026-10-03",
+   "t": "2027-01-14",
+   "road": "external east street",
+   "serves": [
+    "EB3"
+   ],
+   "note": "EB-A excavation open: 1:1 line from the pit bottom"
+  },
+  {
+   "name": "EB3",
+   "label": "PUMP EB3",
+   "x": 269.4,
+   "y": 137.4,
+   "a": 1.5707963267948966,
+   "f": "2027-01-15",
+   "t": "2027-05-26",
+   "road": "external east street",
+   "serves": [
+    "EB3"
+   ],
+   "note": "2 m off the backfilled basement wall"
+  },
+  {
+   "name": "EB4",
+   "label": "PUMP EB4",
+   "x": 269.4,
+   "y": 85.8,
+   "a": 1.5707963267948966,
+   "f": "2026-10-13",
+   "t": "2027-04-06",
+   "road": "external east street",
+   "serves": [
+    "EB4"
+   ],
+   "note": "2 m off the backfilled basement wall"
+  },
+  {
+   "name": "EB5",
+   "label": "PUMP EB5",
+   "x": 269.4,
+   "y": 58.7,
+   "a": 1.5707963267948966,
+   "f": "2026-10-13",
+   "t": "2027-03-07",
+   "road": "external east street",
+   "serves": [
+    "EB5"
+   ],
+   "note": "2 m off the backfilled basement wall"
+  },
+  {
+   "name": "EB6",
+   "label": "PUMP EB6",
+   "x": 269.4,
+   "y": 31.4,
+   "a": 1.5707963267948966,
+   "f": "2026-10-13",
+   "t": "2027-05-04",
+   "road": "external east street",
+   "serves": [
+    "EB6"
+   ],
+   "note": "2 m off the backfilled basement wall"
+  },
+  {
+   "name": "SB4",
+   "label": "PUMP SB4",
+   "x": 141.8,
+   "y": 15,
+   "a": 0,
+   "f": "2027-02-18",
+   "t": "2027-12-01",
+   "road": "south road",
+   "serves": [
+    "SB4"
+   ]
+  },
+  {
+   "name": "SB5",
+   "label": "PUMP SB5",
+   "x": 168.9,
+   "y": 15,
+   "a": 0,
+   "f": "2027-02-18",
+   "t": "2027-12-01",
+   "road": "south road",
+   "serves": [
+    "SB5"
+   ]
+  },
+  {
+   "name": "SB6",
+   "label": "PUMP SB6",
+   "x": 196.3,
+   "y": 15,
+   "a": 0,
+   "f": "2027-02-18",
+   "t": "2027-12-01",
+   "road": "south road",
+   "serves": [
+    "SB6"
+   ]
+  },
+  {
+   "name": "SB1-A",
+   "label": "PUMP SB1",
+   "x": 141.8,
+   "y": 115.5,
+   "a": 0,
+   "f": "2027-02-03",
+   "t": "2027-06-30",
+   "road": "NB land, north edge of the middle road",
+   "serves": [
+    "SB1"
+   ],
+   "note": "SB excavation open, NB not excavated yet"
+  },
+  {
+   "name": "SB2-A",
+   "label": "PUMP SB2",
+   "x": 169.1,
+   "y": 115.5,
+   "a": 0,
+   "f": "2027-02-03",
+   "t": "2027-06-30",
+   "road": "NB land, north edge of the middle road",
+   "serves": [
+    "SB2"
+   ],
+   "note": "SB excavation open, NB not excavated yet"
+  },
+  {
+   "name": "SB3-A",
+   "label": "PUMP SB3",
+   "x": 196.2,
+   "y": 115.5,
+   "a": 0,
+   "f": "2027-02-03",
+   "t": "2027-06-30",
+   "road": "NB land, north edge of the middle road",
+   "serves": [
+    "SB3"
+   ],
+   "note": "SB excavation open, NB not excavated yet"
+  },
+  {
+   "name": "SB1/NB4",
+   "label": "PUMP SB1 / NB4",
+   "x": 141.8,
+   "y": 112,
+   "a": 0,
+   "f": "2027-07-01",
+   "t": "2028-06-17",
+   "road": "middle road",
+   "serves": [
+    "SB1",
+    "NB4"
+   ],
+   "note": "free only after NB backfill"
+  },
+  {
+   "name": "SB3/NB6",
+   "label": "PUMP SB3 / NB6",
+   "x": 196.2,
+   "y": 112,
+   "a": 0,
+   "f": "2027-07-01",
+   "t": "2028-06-17",
+   "road": "middle road",
+   "serves": [
+    "SB3",
+    "NB6"
+   ],
+   "note": "free only after NB backfill"
+  },
+  {
+   "name": "SB2/NB5",
+   "label": "PUMP SB2 / NB5",
+   "x": 169.1,
+   "y": 107.3,
+   "a": 0,
+   "f": "2027-07-01",
+   "t": "2028-06-17",
+   "road": "middle road",
+   "serves": [
+    "SB2",
+    "NB5",
+    "SB1",
+    "SB3"
+   ],
+   "note": "only position that clears the NB excavation (x 156-182, y 106.7-107.8); also serves SB1 and SB3 while their own stands are blocked"
+  }
+ ]
+}

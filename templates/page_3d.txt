@@ -222,6 +222,18 @@ function stopTour(){tour=null;$('#tourbar').classList.remove('show');$('#cutOn')
 $('#tourstop').onclick=stopTour;
 cv.addEventListener('pointerdown',()=>{if(tour)stopTour()});
 
+// ---------- fixed pump + mixer stands (data.stands; ASSUMED unless a logistics plan is given) ----------
+function standGroup(s){const SM=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.9,...o});const g=new THREE.Group();
+ const bx=(w,h,d,c,x,y,z,o)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),SM(c,o));m.position.set(x,y,z);m.castShadow=true;g.add(m);return m};
+ bx(11,.06,4.2,0xf28c28,0,.05,0,{transparent:true,opacity:.75});bx(9.5,.06,3.6,0xf2c230,-11,.05,0,{transparent:true,opacity:.7});
+ bx(9,.8,2.6,0xd8402f,0,.8,0);bx(2.4,2.3,2.5,0xd8402f,3.8,1.9,0);bx(7.2,.45,.5,0xb8321f,-.6,3.3,0);bx(.5,2,.5,0xb8321f,-3.6,2.3,0);
+ [-3.5,3].forEach(x=>[-1,1].forEach(z=>bx(.5,.2,1.6,0x30343a,x,.3,z*2.2)));
+ bx(8,.7,2.5,0x30343a,-11,.8,0);bx(2.2,2.2,2.4,0xf2f2f2,-7.6,1.9,0);
+ const dr=new THREE.Mesh(new THREE.CylinderGeometry(1.25,1.25,5.4,14),SM(0xe9aa2c,{roughness:.5}));dr.rotation.z=Math.PI/2;dr.position.set(-11.8,2.3,0);dr.castShadow=true;g.add(dr);
+ const c=document.createElement('canvas');c.width=256;c.height=80;const q=c.getContext('2d');q.fillStyle='rgba(20,24,29,.9)';q.beginPath();q.roundRect(3,3,250,74,12);q.fill();q.fillStyle='#f28c28';q.font='bold 36px sans-serif';q.textAlign='center';q.textBaseline='middle';const L_=s.l||('PUMP '+s.n);q.font='bold '+(L_.length>10?26:36)+'px sans-serif';q.fillText(L_,128,42);
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));sp.position.set(0,7.5,0);sp.scale.set(9,2.8,1);sp.renderOrder=11;g.add(sp);
+ g.rotation.y=-s.a;return g}
+{const G=new THREE.Group();(D.stands||[]).filter(s=>!/-A$/.test(s.n)).forEach(s=>{const g=standGroup(s);g.position.set(s.x+5.1*Math.cos(s.a),s.z,s.y+5.1*Math.sin(s.a));G.add(g)});scene.add(G)}
 // ---------- site: street, traffic, trees, lamps, time of day ----------
 const site=new THREE.Group();scene.add(site);
 const M=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.95,...o});

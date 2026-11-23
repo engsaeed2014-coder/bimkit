@@ -116,6 +116,185 @@ def add_site(groups, root):
     return True
 
 
+def pump_stands(elements, pattern=r"^[A-Z]{2}\d+$"):
+    """ASSUMED concrete pump + mixer stand per building: the road point nearest the building, clear of every
+    building footprint and of the other stands, truck parallel to the building face. Site logistics are not issued."""
+    import math
+    import re
+    from shapely.geometry import MultiPoint, Point, Polygon
+    from shapely.ops import nearest_points, unary_union
+    roads = []
+    for e in elements:
+        if e["type"] == "ROAD":
+            for q in e["geom"]["parts"]:
+                try:
+                    g = Polygon(q["outer"]).buffer(0)
+                except Exception:
+                    continue
+                if g.area > 4 and q["z1"] > -1.5:          # skip basement ramps
+                    roads.append((g, q["z1"]))
+    pts = defaultdict(list)
+    for e in elements:
+        if re.match(pattern, e["axis"] or "") and e["type"] in ("SLB", "COL", "WAL"):
+            for q in e["geom"]["parts"]:
+                pts[e["axis"]] += q["outer"]
+    if not roads or not pts:
+        return []
+    hull = {k: MultiPoint(v).convex_hull for k, v in pts.items()}
+    solid = unary_union([h.buffer(1.5) for h in hull.values()])
+    road = unary_union([g for g, _ in roads])
+    lane = road.difference(solid).buffer(-1.3)             # room for the truck width
+    if lane.is_empty:
+        lane = road.difference(solid)
+    out, used = [], []
+    for k in sorted(hull):
+        h = hull[k]
+        free = lane.difference(unary_union([Point(u).buffer(13) for u in used])) if used else lane
+        if free.is_empty:
+            free = lane
+        pt = nearest_points(free, h)[0]
+        c = h.centroid
+        ang = math.atan2(c.y - pt.y, c.x - pt.x) + math.pi / 2
+        z = min(roads, key=lambda r: r[0].distance(pt))[1]
+        used.append((pt.x, pt.y))
+        out.append(dict(id="PUMP-" + k, kind="pump", name=k, x=round(pt.x, 2), y=round(pt.y, 2), z=round(z, 2),
+                        a=round(ang, 3), reach_m=round(pt.distance(c), 1), confidence="ASSUMED",
+                        note="nearest road point to the building; site logistics plan not issued"))
+    return out
+
+
+def load_stands(path, root, ox, oy):
+    """Pump stands from a study file: x,y in reveal-4d site coordinates; z = top of the road the truck stands on."""
+    from shapely.geometry import Point, Polygon
+    S = json.load(open(path, encoding="utf-8"))
+    roads = []
+    f = os.path.join(root, "data", "geometry", "SITE.json")
+    if os.path.exists(f):
+        for e in json.load(open(f, encoding="utf-8"))["elements"]:
+            if e["cat"] == "Road" and len(e.get("p", [])) >= 3:
+                try:
+                    roads.append((Polygon(e["p"]).buffer(0), e["z1"]))
+                except Exception:
+                    pass
+    out = []
+    for s in S["stands"]:
+        pt = Point(s["x"], s["y"])
+        zs = [z for g, z in roads if g.contains(pt)]
+        if not zs and roads:                                   # between road pieces: level of the nearest one
+            g, z = min(roads, key=lambda r: r[0].distance(pt))
+            zs = [z] if g.distance(pt) < 8 else []
+        out.append(dict(id="PUMP-" + s["name"], kind="pump", name=s["name"], label=s.get("label"), x=round(s["x"] - ox, 2),
+                        y=round(s["y"] - oy, 2), z=round(max(zs), 2) if zs else 0.0, a=s.get("a", 0), f=s.get("f"), t=s.get("t"),
+                        road=s.get("road"), serves=s.get("serves"), note=s.get("note"), confidence="ASSUMED"))
+    return out
+
+
+def excavation_pits(root, files, acts, ox, oy, stands, work=1.0, repl=1.5, pcc=0.1):
+    """Excavation pit per schedule group, its no-standing strip, and the pump stands it blocks.
+
+    Pit outline = basement footprint of the group (footings + basement slabs + retaining walls of the SUB file, split
+    between the schedule groups by the nearest footing) + `work` m working space. Bottom = lowest footing underside
+    - `pcc` - `repl` (soil replacement). Depth is measured from the site level at the outline (terrain.json).
+    No-standing strip = `depth` wide from the pit edge (1:1 line from the pit bottom). ASSUMED: work, repl, vertical
+    sides, no shoring. Opens with the group's Excavation activities, closes with its External Backfill."""
+    import statistics
+    from shapely import affinity
+    from shapely.geometry import MultiPoint, Polygon, box
+    from shapely.ops import unary_union, voronoi_diagram
+    G = os.path.join(root, "data", "geometry")
+    tf = os.path.join(root, "data", "terrain.json")
+    T = json.load(open(tf, encoding="utf-8")) if os.path.exists(tf) else None
+
+    def ngl(g):
+        if not T:
+            return 0.0
+        v = []
+        for x, y in g.exterior.coords:
+            i, j = int(round((y - T["y0"]) / T["step"])), int(round((x - T["x0"]) / T["step"]))
+            if 0 <= i < T["ny"] and 0 <= j < T["nx"] and T["z"][i * T["nx"] + j] is not None:
+                v.append(T["z"][i * T["nx"] + j])
+        return statistics.median(v) if v else 0.0
+
+    polys = lambda g: [q for q in getattr(g, "geoms", [g]) if q.geom_type == "Polygon" and q.area > 20]
+    raw = []                                                    # (group, polygon, footing level, site level)
+    for f in files:
+        low = []
+        for e in json.load(open(os.path.join(G, f + ".json"), encoding="utf-8"))["elements"]:
+            if e["lv"] in ("FND", "SOG", "BM", "B1") and e["cat"] in ("Footing", "Slab", "RetWall") and len(e.get("p", [])) >= 3:
+                try:
+                    g = Polygon(e["p"]).buffer(0)
+                except Exception:
+                    continue
+                if g.area > 0.3:
+                    low.append((g, e))
+        foot = [(g, e) for g, e in low if e["cat"] == "Footing" and e.get("zn") and g.area < 400]
+        if not foot:
+            continue
+        base = unary_union([Polygon(q.exterior) for q in polys(unary_union([g for g, _ in low]).buffer(3).buffer(-3))])
+        zf, lvl = min(e["z0"] for _, e in foot), ngl(max(polys(base), key=lambda q: q.area))
+        outline = base.buffer(work)
+        name = lambda zn: ("Mall " + zn) if f.upper() == "MALL" else zn
+        zones = sorted({e["zn"] for _, e in foot})
+        if len(zones) == 1:
+            raw.append((name(zones[0]), outline, zf, lvl))
+            continue
+        cen = [(g.centroid.x, g.centroid.y, e["zn"]) for g, e in foot]
+        cells = defaultdict(list)
+        for c in voronoi_diagram(MultiPoint([(x, y) for x, y, _ in cen]), envelope=outline.buffer(60)).geoms:
+            q = c.representative_point()
+            cells[min(cen, key=lambda s: (s[0] - q.x) ** 2 + (s[1] - q.y) ** 2)[2]].append(c)
+        for zn in zones:
+            raw.append((name(zn), unary_union(cells[zn]).intersection(outline), zf, lvl))
+    pits, taken = [], None
+    for gname, g, zf, lvl in raw:                               # no two pits overlap (neighbouring basements touch)
+        if taken is not None:
+            g = g.difference(taken)
+        g = unary_union([Polygon(q.exterior) for q in polys(g.buffer(-0.02))]).simplify(0.15)
+        if g.is_empty:
+            continue
+        taken = g.buffer(0.02) if taken is None else taken.union(g.buffer(0.02))
+        pits.append(dict(id=gname, g=g, zf=zf - pcc, zb=zf - pcc - repl, lvl=lvl, d=round(lvl - (zf - pcc - repl), 1)))
+    allp = unary_union([p["g"] for p in pits]).buffer(0.03)
+    S = lambda x, y: [round(x - ox, 2), round(y - oy, 2)]
+    kw = lambda a, *ks: any(k in a["name"].lower() for k in ks)
+    out = []
+    for i, p in enumerate(pits):
+        g, d = p["g"], p["d"]
+        zone = g.buffer(d)
+        strip = [dict(o=[S(x, y) for x, y in q.exterior.coords], h=[[S(x, y) for x, y in h.coords] for h in q.interiors])
+                 for q in getattr(zone.difference(allp).simplify(0.2), "geoms", [zone.difference(allp).simplify(0.2)])
+                 if q.geom_type == "Polygon" and q.area > 1]
+        A = [a for a in acts if a.get("group") == p["id"]]
+        st = sorted((a for a in A if a.get("package") == "Structure"), key=lambda a: a["start"])
+        out.append(dict(id=p["id"], r=[[S(x, y) for x, y in q.exterior.coords] for q in polys(g)], zb=round(p["zb"], 2),
+                        zf=round(p["zf"], 2), d=d, site_level=round(p["lvl"], 2), s=strip,
+                        e=[a["code"] for a in A if kw(a, "excavation")], rp=[a["code"] for a in A if kw(a, "soil replacement")],
+                        c=[a["code"] for a in A if kw(a, "external backfill")], o=[st[0]["code"]] if st else [],
+                        confidence="ASSUMED", basis=f"work space {work} m, soil replacement {repl} m, PCC {pcc} m, vertical sides"))
+        p["zone"] = zone
+    CONC = ("slab", "column", "wall", "core", "stair", "foundation", "footing", "raft")
+    for s in stands or []:
+        fp = affinity.translate(affinity.rotate(box(-10, -4.25, 10, 4.25), s.get("a", 0), origin=(0, 0), use_radians=True),
+                                s["x"] + ox, s["y"] + oy)
+        s["c"] = [i for i, p in enumerate(pits) if fp.intersects(p["zone"])]
+        b = set(s.get("serves") or s["name"].split("/"))
+        s["p"] = [a["code"] for a in acts if a.get("zone") in b and a.get("package") == "Structure" and kw(a, *CONC)
+                  and not kw(a, "backfill", "waterproof", "walkway", "excavation")]
+    terrain = None
+    if T:      # site surface grid; each vertex knows the pit it falls in, so the viewer can lower it while the pit is open
+        import numpy as np
+        from shapely import contains_xy
+        nx, ny, st = T["nx"], T["ny"], T["step"]
+        XX, YY = np.meshgrid(T["x0"] + np.arange(nx) * st, T["y0"] + np.arange(ny) * st)
+        idx = np.zeros(XX.shape, int)
+        for i, p in enumerate(pits):
+            idx[contains_xy(p["g"].buffer(0.5), XX, YY) & (idx == 0)] = i + 1
+        terrain = dict(x0=round(T["x0"] - ox, 2), y0=round(T["y0"] - oy, 2), step=st, nx=nx, ny=ny,
+                       z=[int(round((v or 0) * 100)) for v in T["z"]], pit=idx.ravel().tolist(),
+                       source="reveal-4d data/terrain.json (site plan level markers, ESTIMATE between them)")
+    return out, terrain
+
+
 def add_assumed(groups, files):
     for f in files:
         if f.endswith("SUB"):
@@ -233,6 +412,9 @@ def main():
     ap.add_argument("--files", nargs="*")
     ap.add_argument("--out", required=True)
     ap.add_argument("--name", default=None)
+    ap.add_argument("--pumps", action="store_true", help="add an ASSUMED pump + mixer stand per building (needs --site roads)")
+    ap.add_argument("--pits", action="store_true", help="add excavation pits per schedule group, no-standing strips and stand clashes")
+    ap.add_argument("--stands", default=None, help="pump stands JSON (reveal-4d site coordinates, with f/t pour period); replaces --pumps")
     ap.add_argument("--site", action="store_true", help="add site works (SITE.json) and soft landscape (landscape.json)")
     ap.add_argument("--stages", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "reveal_stages.json"),
                     help="extra activities per element (finishing stages); '' to use the reveal-4d mapping only")
@@ -349,6 +531,23 @@ def main():
                                  unmapped_elements=orphans, zero_height_pieces_dropped=len(dropped),
                                  assumed_geometry=ST.get("assumed_geometry", {}))))
     os.makedirs(a.out, exist_ok=True)
+    if a.stands:
+        data["stands"] = load_stands(a.stands, a.reveal4d, ox, oy)
+        print(f"pump stands from {os.path.basename(a.stands)}: {len(data['stands'])}")
+    elif a.pumps:
+        data["stands"] = pump_stands(elements)
+        print(f"pump stands (ASSUMED): {len(data['stands'])}"
+              + (f" | reach to building centre {min(s['reach_m'] for s in data['stands'])}-{max(s['reach_m'] for s in data['stands'])} m" if data["stands"] else ""))
+    if a.pits:
+        data["pits"], terrain = excavation_pits(a.reveal4d, files, acts, ox, oy, data.get("stands"))
+        if terrain:
+            data["terrain"] = terrain
+            g = lambda x, y: terrain["z"][min(max(int(round((y - terrain["y0"]) / terrain["step"])), 0), terrain["ny"] - 1) * terrain["nx"]
+                                          + min(max(int(round((x - terrain["x0"]) / terrain["step"])), 0), terrain["nx"] - 1)] / 100
+            for s in data.get("stands") or []:      # stands sit on the site surface
+                s["z"] = round(max(g(s["x"] + dx, s["y"] + dy) for dx in (-6, 0, 6) for dy in (-6, 0, 6)), 2)
+        print("excavation pits (ASSUMED depth = site level - footing underside + PCC + soil replacement): "
+              + ", ".join(f"{p['id']} {p['d']} m" for p in data["pits"]))
     json.dump(data, open(os.path.join(a.out, "data.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     json.dump(dict(source=os.path.basename(a.master), area=" ".join(a.area), activities=acts),
               open(os.path.join(a.out, "activities.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=0)

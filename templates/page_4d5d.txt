@@ -46,7 +46,7 @@ ul.al{list-style:none;margin:0;padding:0;font-size:12px}ul.al li{display:grid;gr
 </style>
 <div id="app">
 <div id="stage"><canvas id="cv" tabindex="0" aria-label="مجسم 4D للمشروع: الفعلي والمتوقع مقابل المخطط"></canvas>
-<div id="top"><div class="chip" id="datechip">تاريخ البيانات · <b id="dtxt">–</b></div><div class="chip" id="c_work">العمالة: <b id="c_w">–</b></div><div class="chip" id="c_prog">التقدم: <b id="c_p">–</b></div><div class="chip" id="c_act">الأنشطة الجارية: <b id="c_a">–</b></div></div>
+<div id="top"><div class="chip" id="datechip">تاريخ البيانات · <b id="dtxt">–</b></div><div class="chip" id="c_work">العمالة: <b id="c_w">–</b></div><div class="chip" id="c_prog">التقدم: <b id="c_p">–</b></div><div class="chip" id="c_act">الأنشطة الجارية: <b id="c_a">–</b></div><div class="chip" id="c_pour" style="display:none">صب اليوم: <b id="c_pr">–</b></div></div>
 <div id="tools"><button data-v="both" class="on">الاتنين</button><button data-v="upd">الفعلي والمتوقع</button><button data-v="base">المخطط</button><button data-v="top">من فوق</button><button id="tg_var" class="on">تلوين الفروقات</button><button id="tg_wk" class="on">العمالة</button><select id="cutsel" aria-label="قطع دور"><option value="">قطع دور: بدون</option></select></div>
 <div id="legend"></div>
 <div class="chip" id="bar"><button id="play">▶ تشغيل</button><select id="spd" aria-label="السرعة"><option value="0.5">×0.5</option><option value="1" selected>×1</option><option value="2">×2</option><option value="4">×4</option></select><select id="stp" aria-label="الخطوة" hidden><option value="d" selected>يومي</option><option value="w">أسبوعي</option><option value="m">شهري</option></select><button id="gdd">تاريخ المتابعة</button><input id="sl" type="range" min="0" max="300" step="1" value="0" aria-label="التاريخ"><span id="dlab" style="min-width:110px;text-align:center;font-family:var(--num)"></span></div></div>
@@ -114,7 +114,9 @@ Object.assign(sun.shadow.camera,{left:-60*SPN,right:180*SPN+OX[1]-95,top:80*SPN,
 // ---------- site ----------
 const M=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.95,...o});const GY=-.03;
 {const sh=new THREE.Shape([[GX0,-(BY1+109*SPN)],[GX1,-(BY1+109*SPN)],[GX1,69*SPN-BY0],[GX0,69*SPN-BY0]].map(p=>new THREE.Vector2(...p)));
- OX.forEach(o=>sh.holes.push(new THREE.Path([[o+BX0-3,-(BY1+5.7)],[o+BX1+3,-(BY1+5.7)],[o+BX1+3,-(BY0-5.9)],[o+BX0-3,-(BY0-5.9)]].map(p=>new THREE.Vector2(...p)))));
+ if(D.terrain){const T=D.terrain,m=T.m,c=[[0,0],[T.nx-1,0],[T.nx-1,T.ny-1],[0,T.ny-1]].map(([j,i])=>{const gx=T.x0+j*T.step,gy=T.y0+i*T.step;return[m[0]*gx+m[1]*gy+m[2],m[3]*gx+m[4]*gy+m[5]]});
+  OX.forEach(o=>sh.holes.push(new THREE.Path(c.map(q=>new THREE.Vector2(o+q[0],-q[1])))))}   /* the site surface grid fills this hole */
+ else OX.forEach(o=>sh.holes.push(new THREE.Path([[o+BX0-3,-(BY1+5.7)],[o+BX1+3,-(BY1+5.7)],[o+BX1+3,-(BY0-5.9)],[o+BX0-3,-(BY0-5.9)]].map(p=>new THREE.Vector2(...p)))));
  const g=new THREE.Mesh(new THREE.ShapeGeometry(sh),M(0x74805f));g.rotation.x=-Math.PI/2;g.position.y=GY;g.receiveShadow=true;scene.add(g)}
 const pit=new THREE.Mesh(new THREE.PlaneGeometry((GX1-GX0)*1.1,300*SPN),M(0x6d6a62));pit.rotation.x=-Math.PI/2;pit.position.set((GX0+GX1)/2,D.levels.FND-1.15,0);pit.receiveShadow=true;scene.add(pit);
 const box=(x0,x1,z0,z1,y,c)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(x1-x0,y,z1-z0),M(c));m.position.set((x0+x1)/2,GY+y/2,(z0+z1)/2);m.receiveShadow=true;scene.add(m)};
@@ -265,6 +267,65 @@ function updatePump(p,b,t,dt){const vis=p.on&&showPump;p.g.visible=vis;p.mx.forE
  p.mx[0].position.set(OX[b]+PUMPX-9.5,0,PUMPZ+.2);p.mx[0].userData.dr.rotation.x=t*.004;
  const cyc=(t*.00005)%1;p.mx[1].position.set(OX[b]+PUMPX-80+cyc*140,0,RZ+2.2);p.mx[1].rotation.y=0;p.mx[1].userData.dr.rotation.x=t*.004}
 let showPump=true;
+// ---------- fixed pump + mixer stands (data.stands; ASSUMED unless a logistics plan is given) ----------
+// ---------- excavation pits (data.pits): open with Excavation, close with External Backfill; red strip = no standing ----------
+const PITS=D.pits||[],PST=[[],[]],TER=[null,null];
+if(PITS.length&&D.terrain){pit.visible=false;const T=D.terrain,m=T.m,n=T.nx*T.ny,GC=new THREE.Color(0x74805f),SC=new THREE.Color(0x8d7b5a);
+ const sm=new THREE.MeshBasicMaterial({color:0xe53935,transparent:true,opacity:.42,depthWrite:false,side:THREE.DoubleSide});
+ const rng=(L,b)=>{let s=1e9,f=-1;(L||[]).forEach(c=>{const a=D.acts[c];if(a){s=Math.min(s,a.a[b?0:2]);f=Math.max(f,a.a[b?1:3])}});return f<0?null:[s,f]};
+ const idx=[];for(let i=0;i<T.ny-1;i++)for(let j=0;j<T.nx-1;j++){const a=i*T.nx+j,b_=a+1,c=a+T.nx,d_=c+1;idx.push(a,c,b_,b_,c,d_)}
+ const vp=PITS.map(()=>[]);for(let k=0;k<n;k++)if(T.pit[k])vp[T.pit[k]-1].push(k);
+ [0,1].forEach(b=>{const pos=new Float32Array(n*3),col=new Float32Array(n*3);
+  for(let i=0;i<T.ny;i++)for(let j=0;j<T.nx;j++){const k=i*T.nx+j,gx=T.x0+j*T.step,gy=T.y0+i*T.step;pos[3*k]=OX[b]+m[0]*gx+m[1]*gy+m[2];pos[3*k+1]=T.z[k]/100;pos[3*k+2]=m[3]*gx+m[4]*gy+m[5];col[3*k]=GC.r;col[3*k+1]=GC.g;col[3*k+2]=GC.b}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setIndex(idx);
+  const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:.95,side:THREE.DoubleSide}));mesh.receiveShadow=true;mesh.frustumCulled=false;scene.add(mesh);
+  /* skirt: closes the step between the grid edge and the flat ground around it */
+  const ring=[];for(let j=0;j<T.nx;j++)ring.push(j);for(let i=1;i<T.ny;i++)ring.push(i*T.nx+T.nx-1);for(let j=T.nx-2;j>=0;j--)ring.push((T.ny-1)*T.nx+j);for(let i=T.ny-2;i>=0;i--)ring.push(i*T.nx);
+  const sp=[],si=[];ring.forEach((k,q)=>{sp.push(pos[3*k],pos[3*k+1],pos[3*k+2],pos[3*k],GY,pos[3*k+2]);if(q){const a=2*q-2;si.push(a,a+1,a+2,a+1,a+3,a+2)}});
+  const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));sg.setIndex(si);sg.computeVertexNormals();scene.add(new THREE.Mesh(sg,M(0x74805f,{side:THREE.DoubleSide})));
+  TER[b]={g,pos,col,vp,GC,SC};
+  PITS.forEach((p,i)=>{const o=OX[b];const strip=new THREE.Mesh(new THREE.ShapeGeometry(p.s.map(q=>{const S=new THREE.Shape(q.o.map(u=>new THREE.Vector2(o+u[0],-u[1])));q.h.forEach(h=>S.holes.push(new THREE.Path(h.map(u=>new THREE.Vector2(o+u[0],-u[1])))));return S})),sm);
+   strip.rotation.x=-Math.PI/2;strip.position.y=(p.site||0)+.25;strip.renderOrder=3;strip.visible=false;scene.add(strip);
+   const ex=rng(p.e,b),op=ex||rng(p.o,b),cl=rng(p.c,b);PST[b][i]={strip,ex,rp:rng(p.rp,b),s:op?op[0]:1e9,f:cl?cl[1]:1e9,open:false,key:''}})})}
+function pitUpd(b,d){const R_=TER[b];if(!R_)return;const T=D.terrain,cl=x=>Math.max(0,Math.min(1,x));let ch=false;
+ PITS.forEach((p,i)=>{const S=PST[b][i];S.open=d>=S.s&&d<=S.f;
+  const pe=!S.open?0:(S.ex?cl((d-S.ex[0]+1)/(S.ex[1]-S.ex[0]+1)):1),pr=!S.open?0:(S.rp?(pe>=1?cl((d-S.rp[0]+1)/(S.rp[1]-S.rp[0]+1)):0):(S.ex?0:1));
+  S.strip.visible=S.open;const key=pe.toFixed(3)+'|'+pr.toFixed(3);if(key===S.key)return;S.key=key;ch=true;
+  /* vertices inside the pit go down with the excavation and come back up with the soil replacement; backfill returns them to site level */
+  const c=pe>0?R_.SC:R_.GC;R_.vp[i].forEach(k=>{const z=T.z[k]/100;R_.pos[3*k+1]=Math.min(z,z+(p.zb-z)*pe+(p.zf-p.zb)*pr);R_.col[3*k]=c.r;R_.col[3*k+1]=c.g;R_.col[3*k+2]=c.b})});
+ if(ch){R_.g.attributes.position.needsUpdate=true;R_.g.attributes.color.needsUpdate=true}}
+// ---------- pump stands (data.stands): shown while their buildings pour, blocked while inside an open pit's strip, boom out on pour day ----------
+function standGroup(s){const SM=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.9,...o});const g=new THREE.Group(),tr=new THREE.Group();tr.position.x=5.1;g.add(tr);
+ const bx=(P,w,h,d,c,x,y,z,o)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),SM(c,o));m.position.set(x,y,z);m.castShadow=true;P.add(m);return m};
+ const pad=bx(g,20,.06,8.5,0xf28c28,0,.05,0,{transparent:true,opacity:.5});pad.castShadow=false;
+ bx(tr,9,.8,2.6,0xd8402f,0,.8,0);bx(tr,2.4,2.3,2.5,0xd8402f,3.8,1.9,0);bx(tr,.5,2,.5,0xb8321f,-3.6,2.3,0);
+ const fold=bx(tr,7.2,.45,.5,0xb8321f,-.6,3.3,0);
+ [-3.5,3].forEach(x=>[-1,1].forEach(z=>{bx(tr,.3,.25,3,0x30343a,x,.45,z*2.6);bx(tr,.9,.14,.9,0x30343a,x,.12,z*3.8)}));   /* outriggers fully out: 8.5 m */
+ bx(tr,8,.7,2.5,0x30343a,-11,.8,0);bx(tr,2.2,2.2,2.4,0xf2f2f2,-7.6,1.9,0);
+ const dr=new THREE.Mesh(new THREE.CylinderGeometry(1.25,1.25,5.4,14),SM(0xe9aa2c,{roughness:.5}));dr.rotation.z=Math.PI/2;dr.position.set(-11.8,2.3,0);dr.castShadow=true;tr.add(dr);
+ const mk=(txt,col)=>{const c=document.createElement('canvas');c.width=256;c.height=80;const q=c.getContext('2d');q.fillStyle='rgba(20,24,29,.9)';q.beginPath();q.roundRect(3,3,250,74,12);q.fill();q.fillStyle=col;q.textAlign='center';q.textBaseline='middle';q.font='bold '+(txt.length>10?24:36)+'px sans-serif';q.fillText(txt,128,42);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));sp.position.set(0,7.5,0);sp.scale.set(9,2.8,1);sp.renderOrder=11;g.add(sp);return sp};
+ const L_=s.l||('PUMP '+s.n),lab=mk(L_,'#f28c28'),labX=mk('✕ '+L_,'#ff6b5e');labX.visible=false;
+ g.rotation.y=-s.a;return{g,tr,pad,fold,lab,labX}}
+const STANDS=D.stands||[];
+const STO=[0,1].map(b=>STANDS.map(s=>{const o=standGroup(s);o.s=s;o.g.position.set(OX[b]+s.x,s.z,s.y);scene.add(o.g);o.g.updateMatrixWorld(true);o.piv=o.tr.localToWorld(new THREE.Vector3(-3.6,3.3,0));
+ o.w=[s.f?Date.parse(s.f):-Infinity,s.t?Date.parse(s.t)+DAY-1:Infinity];o.tg=null;o.until=0;o.live=false;
+ o.seg=[0,1,2,3].map(k=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(k<3?.2:.11,k<3?.24:.11,1,8),M(k<3?0xd8402f:0x3b3f44));m.castShadow=true;m.visible=false;scene.add(m);return m});
+ /* pour day (ASSUMED) = last day of each concrete activity; target = the element of that activity in the building served */
+ o.pd=new Map();(s.p||[]).forEach(c=>{const a=D.acts[c];if(!a)return;let e=null;EL.forEach(x=>{if(x.k.includes(c)&&(s.b||[]).includes(x.ax)&&(!e||x.v>e.v))e=x});if(e){const f=a.a[b?1:3];(o.pd.get(f)||o.pd.set(f,[]).get(f)).push(e)}});
+ return o}));
+if(STANDS.length)showPump=false;   /* fixed stands replace the generic street pump */
+function drawBoom(o,b){const e=o.tg;o.fold.visible=!e;if(!e){o.seg.forEach(m=>m.visible=false);return}
+ const piv=o.piv,tip=new THREE.Vector3(OX[b]+e.x,e.z1+2.6,e.y),dist=piv.distanceTo(tip);
+ const el=piv.clone().lerp(tip,.38);el.y+=Math.min(17,dist*.32);const mid=piv.clone().lerp(tip,.78);mid.y+=Math.min(8,dist*.12);
+ seg3(o.seg[0],piv,el);seg3(o.seg[1],el,mid);seg3(o.seg[2],mid,tip);seg3(o.seg[3],tip,new THREE.Vector3(tip.x,e.z1+.3,tip.z))}
+function standUpd(b,d){if(!STANDS.length)return;const tm=dms[Math.min(d,ND-1)],now=performance.now(),taken=new Set(),txt=[];
+ STO[b].forEach(o=>{const s=o.s,inW=tm>=o.w[0]&&tm<=o.w[1];o.g.visible=inW;o.live=false;if(!inW){o.tg=null;drawBoom(o,b);return}
+  const blk=(s.c||[]).some(i=>PST[b][i]&&PST[b][i].open);o.tr.visible=!blk;o.lab.visible=!blk;o.labX.visible=blk;o.pad.material.color.setHex(blk?0xe53935:0xf28c28);
+  const e=blk?null:(o.pd.get(d)||[]).find(x=>!taken.has(x.id));
+  if(e){taken.add(e.id);o.tg=e;o.live=true;o.until=now+900;if(b===0)txt.push(e.ax+' · '+e.f)}else if(blk||now>o.until)o.tg=null;drawBoom(o,b)});
+ if(b===0){const c=$('#c_pour');if(c){c.style.display=txt.length?'':'none';$('#c_pr').textContent=txt.join('، ')}}}
+function standTick(){if(!STANDS.length)return;const now=performance.now();STO.forEach((L,b)=>L.forEach(o=>{if(o.tg&&!o.live&&now>o.until){o.tg=null;drawBoom(o,b)}}))}
 // ---------- cranes ----------
 const CY=D.crane.y,CXs=D.crane.x,JIB=D.crane.jib;const yel=M(0xf2c230,{roughness:.5,metalness:.3}),dark=M(0x3b3f44);
 function makeCrane(){const g=new THREE.Group();const mast=new THREE.Mesh(new THREE.BoxGeometry(1.5,1,1.5),yel);mast.castShadow=true;g.add(mast);
@@ -332,7 +393,7 @@ function actUI(d){const cnt={done:0,prog:0,open:0,late:0};
  const top=AC.filter(r=>r.src>0).sort((a,b)=>b.src-a.src).slice(0,8),mx=top.length?top[0].src:1;
  $('#dsrc').innerHTML=(top.length?top.map(r=>`<div style="font-size:11.5px;margin:4px 0"><div style="display:flex;justify-content:space-between"><span>${r.c} · ${r.a.n}</span><b style="font-family:var(--num)">+${r.src}ي</b></div><div style="height:6px;background:var(--line);border-radius:3px"><div style="height:6px;width:${r.src/mx*100}%;background:var(--red);border-radius:3px"></div></div><small style="opacity:.7">${r.od>0?'زيادة مدة التنفيذ +'+r.od+'ي ':''}${r.wt>0?'بداية متأخرة +'+r.wt+'ي':''}</small></div>`).join(''):'لا تأخير')+`<div style="font-size:11px;opacity:.7;margin-top:6px">التأخير الكلي ${D.delay} يوم = مجموع التأخير الذي أضافته الأنشطة الحرجة (زيادة المدة + التأخير في البداية بعد انتهاء السوابق).</div>`}
 function monthTable4(d){const cur=monOf(d);const r1=v=>v.toFixed(1);let h='<table style="width:100%;font-size:11.5px;border-collapse:collapse;font-family:var(--num)"><tr style="position:sticky;top:0;background:var(--panel,#fff)"><th style="text-align:right">الشهر</th><th>مخطط الشهر</th><th>فعلي الشهر</th><th>تراكمي مخطط</th><th>تراكمي فعلي</th><th>عمالة مخطط</th><th>عمالة فعلي</th></tr>';MONS.forEach(m=>{const pe=prevEnd(m),b1=cum[1][m.i1],u1=cum[0][m.i1],b0=pe>=0?cum[1][pe]:0,u0=pe>=0?cum[0][pe]:0,fc=m.i0>DD,df=(u1-u0)-(b1-b0);h+=`<tr id="mr_${m.k}" style="border-top:1px solid var(--line)${m===cur?';background:rgba(232,163,61,.18);font-weight:600':''}"><td style="text-align:right">${monLab(m)}</td><td style="text-align:center">${r1(b1-b0)}%</td><td style="text-align:center" class="${df<-1?'bad':df>1?'good':''}">${r1(u1-u0)}%${fc?' <i>متوقع</i>':''}</td><td style="text-align:center">${r1(b1)}%</td><td style="text-align:center">${r1(u1)}%</td><td style="text-align:center">${Math.round(avgL(D.pl,m))}</td><td style="text-align:center">${Math.round(avgL(D.up,m))}</td></tr>`});$('#mt4').innerHTML=h+'</table>';const r=document.getElementById('mr_'+cur.k);if(r&&!monthTable4.s){monthTable4.s=1;r.scrollIntoView({block:'nearest'})}}
-function updateUI(d,st,fl0,fl1){actUI(d);if(MODE5&&window.__cost5)setTimeout(()=>__cost5.draw(d),0);
+function updateUI(d,st,fl0,fl1){actUI(d);[0,1].forEach(b=>{pitUpd(b,d);standUpd(b,d)});if(MODE5&&window.__cost5)setTimeout(()=>__cost5.draw(d),0);
  const pb=cum[1][d],pu=cum[0][d],spi=pb>0?pu/pb:1,dd=d>DD;
  ($('#dtxt')||{}).textContent=fmt(dms[Math.min(d,ND-1)]);
  const wk0=D.pl[d],wk1=D.up[d],Mc=monOf(d);($('#c_w')||{}).textContent=`${Math.round(avgL(D.up,Mc))} فعلي${dd?' (متوقع)':''} / ${Math.round(avgL(D.pl,Mc))} مخطط · متوسط ${monLab(Mc)}`;
@@ -366,7 +427,7 @@ function VIEW(v){const W=BX1-BX0,Dp=BY1-BY0,zc=(BY0+BY1)/2,asp=cam.aspect||1.6,t
 let tw=null;function fly(p,t,ms=900){const p0=cam.position.clone(),t0=ctl.target.clone(),s=performance.now();tw=n=>{const k=Math.min(1,(n-s)/ms),e=k*k*(3-2*k);cam.position.lerpVectors(p0,p,e);ctl.target.lerpVectors(t0,t,e);if(k>=1)tw=null}}
 document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('on',x===b));const v=b.dataset.v;
  const p=VIEW(v);if(p)fly(p[0],p[1])});
-$('#legend').innerHTML=[['--red','متأخر عن المخطط بأكتر من 10 نقاط'],['--grn','سابق المخطط بأكتر من 10 نقاط'],['--acc','متوقع (لسه ما اتنفذش)']].map(([c,t])=>`<div class="chip"><i class="sw" style="background:var(${c})"></i>${t}</div>`).join('')+`<div class="chip"><i class="sw" style="background:#d0a56a"></i>شدة / حديد تحت التنفيذ</div>`;
+$('#legend').innerHTML=[['--red','متأخر عن المخطط بأكتر من 10 نقاط'],['--grn','سابق المخطط بأكتر من 10 نقاط'],['--acc','متوقع (لسه ما اتنفذش)']].map(([c,t])=>`<div class="chip"><i class="sw" style="background:var(${c})"></i>${t}</div>`).join('')+`<div class="chip"><i class="sw" style="background:#d0a56a"></i>شدة / حديد تحت التنفيذ</div>`+((D.pits||[]).length?`<div class="chip"><i class="sw" style="background:#e53935"></i>ممنوع وقوف معدات (حافة حفر مفتوح)</div>`:'');
 // labels
 const LBL=[];function label(t,x,y,z){const c=document.createElement('canvas');c.width=512;c.height=96;const g=c.getContext('2d');g.fillStyle='rgba(20,24,29,.88)';g.beginPath();g.roundRect(4,8,504,80,14);g.fill();g.fillStyle='#f0b43f';g.font='bold 40px IBM Plex Sans Arabic, sans-serif';g.textAlign='center';g.textBaseline='middle';g.direction='rtl';g.fillText(t,256,50);
  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));s.position.set(x,y,z);s.scale.set(26,4.9,1);s.renderOrder=10;scene.add(s);const tex=s.material.map;const h={set(a,b){const g=c.getContext('2d');g.clearRect(0,0,512,96);g.fillStyle='rgba(20,24,29,.9)';g.beginPath();g.roundRect(4,4,504,88,14);g.fill();g.textAlign='center';g.fillStyle='#f0b43f';g.font='bold 34px IBM Plex Sans Arabic, sans-serif';g.fillText(a,256,40);g.fillStyle='#fff';g.font='600 30px Space Grotesk, sans-serif';g.fillText(b,256,80);tex.needsUpdate=true}};LBL.push(h);return h}
@@ -375,7 +436,7 @@ setTimeout(()=>{label('الفعلي والمتوقع (Update)',CX,RZ,10);label('
 let tgt=[null,null],tgtT=0;
 function loop(t){requestAnimationFrame(loop);const dt=Math.min(.1,(t-last)/1000||0);last=t;
  if(playing){const s_=STP();acc+=dt*(+$('#spd').value)*(s_==='d'?6:s_==='w'?3:1.2);while(acc>=1){acc-=1;if(cd>=MAXCD){playing=false;$('#play').textContent='▶ تشغيل';$('#play').classList.remove('on');break}setCD(s_==='d'?cd+1:s_==='w'?cd+7:monthEnd(cd,1))}}
- if(tw)tw(t);ctl.update();
+ if(tw)tw(t);ctl.update();standTick();
  cars.forEach(c=>{c.x+=c.v*dt;if(c.x>170)c.x=-120;if(c.x<-120)c.x=170;c.g.position.x=c.x});
  const d=idxAt(cd);
  if(t-tgtT>3500){tgtT=t;[0,1].forEach(b=>{const L=meshes[b].map((m,i)=>[m,i]).filter(([m,i])=>m.visible&&elState(EL[i],b,d).st&&elState(EL[i],b,d).st<4);tgt[b]=L.length?EL[L[Math.floor(Math.random()*L.length)][1]]:null})}

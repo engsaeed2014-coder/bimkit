@@ -63,6 +63,9 @@ python3 cost.py     examples/reveal-eb/project.json out      # budget mode: acti
 python3 viewer.py   examples/reveal-eb/project.json out
 # المشروع كله: كذا Area مع بعض، و --site بيضيف الموقع العام (SITE.json) واللاندسكيب (landscape.json، ESTIMATE)
 python3 adapters/reveal4d.py --reveal4d ../reveal-4d --master master.xlsx --area WB EB NB SB Mall --site --out examples/reveal-all
+# --pits: حفر كل مجموعة بيتفتح مع نشاط Excavation ويتقفل مع External Backfill، وحواليه شريط ممنوع الوقوف بعرض عمق الحفر (ASSUMED)
+# --stands: وقفات البامب من ملف (pump_stands.json)، أي وقفة جوّه شريط حفر مفتوح بتتعلّم ✕، والـboom بيتفرد آخر يوم في نشاط الخرسانة
+python3 adapters/reveal4d.py --reveal4d ../reveal-4d --master master.xlsx --area WB EB NB SB Mall --site --pits --stands examples/reveal-all/pump_stands.json --out examples/reveal-all
 ```
 
 - `activities.json`: فيه لكل نشاط الكود، والاسم، والدور، والزون، والبداية والنهاية، وكمان `budget` = الكمية، والوحدة، والسعر، والتكلفة، والمصدر.
