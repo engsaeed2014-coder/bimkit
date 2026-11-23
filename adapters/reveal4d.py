@@ -12,7 +12,9 @@
 Coordinates are moved to a local origin (shift recorded in data.json cfg.qa.origin_shift).
 """
 import argparse
+import datetime as dt
 import json
+import re
 import os
 import sys
 from collections import defaultdict
@@ -82,6 +84,70 @@ def _poly_pieces(geom):
     return out
 
 
+SITE_STAGES = [   # PROPOSED sequence after the last concrete pour of the neighbouring blocks (days from that start, ASSUMED)
+    ("S1", "Infrastructure, road base & kerbs", 0, 60, ("Road", "Curb")),
+    ("S2", "Hardscape paving & pools", 45, 120, ("Paving", "Pool")),
+    ("S3", "Softscape: planters, lawn, hedges, trees", 100, 180, ("Planter", "Lawn", "Hedge", "TreeTrunk", "TreeCanopy")),
+]
+CONCRETE = re.compile(r"slab|column|wall|core|stair|foundation|footing|raft|\bsog\b|pcc|plain concrete|beam", re.I)
+NOT_CONCRETE = re.compile(r"backfill|waterproof|excavation|soil|insulation|block|walkway", re.I)
+
+
+def block_outlines(root):
+    """Basement outline of each block (WB, EB, NB, SB, Mall) from its substructure file."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    G, out = os.path.join(root, "data", "geometry"), defaultdict(list)
+    for n in sorted(os.listdir(G)):
+        if not (n.endswith("-SUB.json") or n == "MALL.json"):
+            continue
+        b = "Mall" if n == "MALL.json" else n[:2]
+        for e in json.load(open(os.path.join(G, n), encoding="utf-8"))["elements"]:
+            if e["lv"] in ("FND", "SOG", "BM", "B1") and len(e.get("p", [])) >= 3:
+                try:
+                    out[b].append(Polygon(e["p"]).buffer(0))
+                except Exception:
+                    pass
+    return {b: unary_union(v).buffer(3).buffer(-3) for b, v in out.items()}
+
+
+SITE_START = {"mode": "global"}   # global: all site works after the last concrete activity on site; zone: per neighbouring blocks
+
+
+def site_zone(blocks, pts):
+    """Site zone = the blocks a piece sits between: all blocks within 10 m of the nearest one (and within 45 m)."""
+    if SITE_START["mode"] == "global":
+        return "SITE-ALL"
+    from shapely.geometry import MultiPoint
+    c = MultiPoint([tuple(p) for p in pts]).centroid
+    d = {b: g.distance(c) for b, g in blocks.items()}
+    m = min(d.values())
+    near = sorted(b for b, v in d.items() if v <= m + 10 and v <= 45) or [min(d, key=d.get)]
+    return "SITE-" + "+".join(near)
+
+
+def site_activities(acts, zones):
+    """PROPOSED site-works activities (not in the Master): each zone starts the day after the last concrete activity
+    of the blocks it sits between, then runs the SITE_STAGES sequence."""
+    blk = lambda a: "Mall" if a["wbs"].startswith("Mall") else a["wbs"][:2]
+    last = {}
+    for a in acts:
+        if a["package"] == "Structure" and CONCRETE.search(a["name"]) and not NOT_CONCRETE.search(a["name"]):
+            last[blk(a)] = max(last.get(blk(a), a["finish"]), a["finish"])
+    out, rule = [], {}
+    for z in sorted(zones):
+        bs = list(last) if z == "SITE-ALL" else z[5:].split("+")
+        s0 = dt.date.fromisoformat(max(last[b] for b in bs if b in last)) + dt.timedelta(days=1)
+        rule[z] = (s0, bs)
+        for k, nm, d0, d1, _ in SITE_STAGES:
+            out.append(dict(code=f"SW-{z[5:]}-{k}", name=f"Site works · {z[5:]} · {nm}", name_ar=f"الموقع العام · {z[5:]} · {nm}",
+                            type="task", wbs=f"SITE.{z[5:]}", floor="EXT", zone=z, step="Site Works", package="Site Works",
+                            group="SITE", start=str(s0 + dt.timedelta(days=d0)), finish=str(s0 + dt.timedelta(days=d1)), budget=None,
+                            note=f"PROPOSED, not in the Master: starts the day after the last concrete activity of {' + '.join(bs)}; "
+                                 f"stage {d0}-{d1} days (ASSUMED)"))
+    return out, rule, last
+
+
 def add_site(groups, root):
     """Site works as drawn (SITE.json: roads, paving, kerbs, planters, pools) + soft landscape (landscape.json, ESTIMATE:
     no planting plan issued). The Master has no site activities, so main() links them to its last activity."""
@@ -89,21 +155,23 @@ def add_site(groups, root):
     f = os.path.join(root, "data", "geometry", "SITE.json")
     if not os.path.exists(f):
         return False
+    blocks = block_outlines(root)
     for e in json.load(open(f, encoding="utf-8"))["elements"]:
         if e["cat"] in TYPE and len(e.get("p", [])) >= 3 and e["z1"] - e["z0"] >= 0.01:
-            groups[("SITE", "EXT", e["cat"], None, "SITE")].append(e)
+            groups[("SITE", "EXT", e["cat"], None, site_zone(blocks, e["p"]))].append(e)
     f = os.path.join(root, "data", "landscape.json")
     if os.path.exists(f):
         L = json.load(open(f, encoding="utf-8"))
         for cat, key, h in (("Lawn", "lawn", 0.08), ("Hedge", "hedge", 1.0)):
             for a in L.get(key, []):
                 if len(a["p"]) >= 3:
-                    groups[("SITE", "EXT", cat, None, "SITE")].append(
+                    groups[("SITE", "EXT", cat, None, site_zone(blocks, a["p"]))].append(
                         dict(p=a["p"], h=a.get("h", []), z0=a["z"], z1=a["z"] + h, est="landscape ESTIMATE"))
         ring = lambda x, y, r, n: [[x + r * math.cos(2 * math.pi * i / n), y + r * math.sin(2 * math.pi * i / n)] for i in range(n)]
         RAD = {"palm": 1.7, "broad": 2.6, "cypress": 0.8}
         for x, y, z, kind, h in L.get("trees", []):
-            groups[("SITE", "EXT", "TreeTrunk", None, "SITE")].append(
+            zk = site_zone(blocks, [[x, y]])
+            groups[("SITE", "EXT", "TreeTrunk", None, zk)].append(
                 dict(p=ring(x, y, 0.16, 6), z0=z, z1=z + h * (0.82 if kind == "palm" else 0.55), est="landscape ESTIMATE"))
             r = RAD.get(kind, 2)
             # canopy as stacked tiers so it reads as a crown, not a drum: (bottom, top, radius factor) of the height
@@ -111,7 +179,7 @@ def add_site(groups, root):
                      "cypress": [(0.20, 0.45, 1.0), (0.45, 0.70, 0.8), (0.70, 0.88, 0.55), (0.88, 1.0, 0.25)]
                      }.get(kind, [(0.50, 0.62, 0.7), (0.62, 0.82, 1.0), (0.82, 0.93, 0.75), (0.93, 1.0, 0.4)])
             for b0, b1, k in tiers:
-                groups[("SITE", "EXT", "TreeCanopy", None, "SITE")].append(
+                groups[("SITE", "EXT", "TreeCanopy", None, zk)].append(
                     dict(p=ring(x, y, r * k, 10), z0=z + h * b0, z1=z + h * b1, est="landscape ESTIMATE"))
     return True
 
@@ -415,6 +483,8 @@ def main():
     ap.add_argument("--pumps", action="store_true", help="add an ASSUMED pump + mixer stand per building (needs --site roads)")
     ap.add_argument("--pits", action="store_true", help="add excavation pits per schedule group, no-standing strips and stand clashes")
     ap.add_argument("--stands", default=None, help="pump stands JSON (reveal-4d site coordinates, with f/t pour period); replaces --pumps")
+    ap.add_argument("--site-start", choices=["global", "zone"], default="global",
+                    help="site works start after the last concrete activity on the whole site (global) or of the blocks around each zone")
     ap.add_argument("--site", action="store_true", help="add site works (SITE.json) and soft landscape (landscape.json)")
     ap.add_argument("--stages", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "reveal_stages.json"),
                     help="extra activities per element (finishing stages); '' to use the reveal-4d mapping only")
@@ -458,6 +528,7 @@ def main():
     if ST.get("assumed_geometry"):
         add_assumed(groups, files)
 
+    SITE_START["mode"] = a.site_start
     site = a.site and add_site(groups, a.reveal4d)
     if site:
         levels["EXT"], tops["EXT"] = 0, 0.3
@@ -506,12 +577,17 @@ def main():
     acts, skipped = load_master(a.master, a.sheet, set(a.area))
     codes = {x["code"] for x in acts}
     links = apply_stages(ST.get("rules", []), meta, links, acts)
-    if site:   # TEMPORARY: no site activities in the Master -> shown from its last activity (as reveal-4d does)
-        last = max(acts, key=lambda x: (x["finish"], x["code"]))["code"]
+    if site:   # no site activities in the Master: PROPOSED ones, after the last concrete pour of the blocks around each zone
+        zones = {m["part"] for m in meta.values() if str(m["part"]).startswith("SITE-")}
+        sw, rule, last = site_activities(acts, zones)
+        acts += sw
+        codes |= {x["code"] for x in sw}
+        stage = {c: k for k, _, _, _, cs in SITE_STAGES for c in cs}
         for eid, m in meta.items():
-            if m["part"] == "SITE":
-                links[eid] = dict(tasks=[last])
-        print(f"site works + landscape linked to the last Master activity {last} (TEMPORARY, no site activities in the Master)")
+            if str(m["part"]).startswith("SITE-"):
+                links[eid] = dict(tasks=[f"SW-{m['part'][5:]}-{stage[m['cat']]}"])
+        print("last concrete activity per block: " + ", ".join(f"{b} {d}" for b, d in sorted(last.items())))
+        print("site works zones (PROPOSED start): " + ", ".join(f"{z[5:]} {s}" for z, (s, _) in sorted(rule.items(), key=lambda r: r[1][0])))
     drop = {e["id"] for e in elements if e["confidence"] == "ASSUMED" and e["id"] not in links}
     if drop:   # ASSUMED geometry with no Master activity (e.g. WB earthworks not in the Master): leave it out
         elements = [e for e in elements if e["id"] not in drop]
