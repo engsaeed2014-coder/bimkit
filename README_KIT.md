@@ -1,5 +1,8 @@
 # BIM kit — 3D / 4D / 5D
 
+> REVEAL: read `CONTEXT.md` first (how this kit builds the REVEAL 5D page, sources, decisions, assumptions).
+
+
 السكريبتات اللي بتشتغل بيها الـ skills الثلاثة:
 `drawings-to-3d-model` (3D) ← `bim-4d-schedule` (4D) ← `bim-5d-cost` (5D).
 الـ 3D بيطلّع `data.json` (عناصر الموديل). الـ kit بياخده ويبني عليه البرنامج والتكلفة وصفحة العرض.
