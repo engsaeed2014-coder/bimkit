@@ -1,54 +1,72 @@
-# REVEAL 5D — Context (read this first, nothing else unless needed)
+# REVEAL 5D — المرجع (اقرأ ده الأول، ومتفتحش غيره إلا لو محتاج)
 
-Reference repo for the REVEAL Residential Compound 3D / 4D / 5D page (model + schedule + cost), Al-Obour.
-Owner: Saeed. The kit itself is generic (`README_KIT.md`); this file covers how it is used for REVEAL.
-Geometry comes from [reveal-4d](https://github.com/REVEAL-Compound/reveal-4d); this repo does not keep its own drawings.
+مرجع صفحة الـ 3D / 4D / 5D (مجسم + جدول زمني + تكلفة) لكمبوند REVEAL السكني، مدينة العبور.
+المالك: سعيد. الـ kit نفسه عام (`README_KIT.md`)، والملف ده بيشرح استخدامه في REVEAL.
+الـ geometry جاية من [reveal-4d](https://github.com/REVEAL-Compound/reveal-4d)، والريبو ده مفيهوش رسومات خاصة بيه.
 
-## Build (one command)
+## البناء (أمر واحد)
 ```
 examples/reveal-all/build.sh <reveal-4d clone> <baseline master.xlsx> <actualized master.xlsx> <data date> [out]
-# current issue:
+# الإصدار الحالي:
 examples/reveal-all/build.sh ../reveal-4d master_v03.xlsx master_v04.xlsx 2026-10-03
 ```
-Output: `out/reveal-all/index.html` (3D + 4D + 5D tabs, ~30 MB, one file) + Programme / Update / Budget_Baseline /
-Cost_Report workbooks + XER. The page is sent as a file (not published as an artifact: project data).
+الناتج: `out/reveal-all/index.html` (تابات 3D و4D و5D في ملف واحد، حوالي 30MB)، ومعاه ملفات Excel للـ Programme
+والـ Update والـ Budget_Baseline والـ Cost_Report، وملف XER. الصفحة بتتبعت كملف، ومش بتتنشر كـ artifact لأنها بيانات مشروع.
 
-## Sources
-| Input | Where | Rule |
+## المصادر
+| المدخل | مكانه | القاعدة |
 |---|---|---|
-| Geometry | reveal-4d `data/geometry/*.json`, `SITE.json`, `landscape.json`, `terrain.json` | read only |
-| Baseline | -REVEAL-Schedule-Control tag `master-v03` | sheet `Master Schedule موحد` |
-| Update (actuals) | -REVEAL-Schedule-Control tag `master-v04` (actualized from IR/CPR, data date 2026-10-03) | new tag = new update |
-| Budget | Master cost loading (BOQ rates incl. 25% margin) — Saeed's choice | not the Cost Control (cost-price) model |
+| الـ geometry | reveal-4d: `data/geometry/*.json` و`SITE.json` و`landscape.json` و`terrain.json` | قراءة بس |
+| الـ baseline | -REVEAL-Schedule-Control، تاج `master-v03` | شيت `Master Schedule موحد` |
+| الـ update (الفعلي) | -REVEAL-Schedule-Control، تاج `master-v04` (متحدّث من IR/CPR، الـ data date 3 أكتوبر 2026) | تاج جديد = تحديث جديد |
+| الميزانية | تحميل التكلفة في الماستر (أسعار المقايسة شاملة هامش 25%)، اختيار سعيد | مش موديل الكوست كنترول (سعر التكلفة) |
 
-Data files made by the adapter (`data.json`, `activities.json`, `links.json`, `*_Update.xlsx`) are git-ignored.
+ملفات البيانات اللي بيعملها الـ adapter (`data.json` و`activities.json` و`links.json` و`*_Update.xlsx`) مش بتترفع على GitHub.
 
-## Decisions (Saeed)
-- Budget basis: Master rates (2026-11-22). Actual cost (AC) not linked yet: AC = EV. Linking AC from
-  REVEAL-Cost-Control was put on hold (2026-11-23) — cost basis differs (cost price vs selling), see the note below.
-- Whole project in one page: WB, EB, NB, SB + Mall (2026-11-22).
-- Model moves daily; every figure on the page is monthly (cards, month table, month activity list) (2026-11-24).
-- Only the actual (update) model is drawn; baseline figures still drive the planned numbers (2026-11-24).
-- Key cards float on the view as glass cards in the free screen space; settings stay in the side panel; colour legend removed (2026-11-23).
-- Site works and landscape start after the last concrete activity on the whole site (2026-11-23): `--site-start global`.
-- Pump stands: from the pump standing study, `examples/reveal-all/pump_stands.json` (2026-11-23).
-  EB from the external east street; west/east internal roads too narrow (8.6 m road, 11.5 m between basements);
-  middle road usable with conditions. NB1-NB3 have no stand Dec-2027 to Jun-2028 — decision open.
+## قرارات سعيد
+- الميزانية بأسعار الماستر (22 نوفمبر 2026). التكلفة الفعلية (AC) لسه مش مربوطة، فـ AC = EV.
+  ربط الـ AC من REVEAL-Cost-Control اتأجل (23 نوفمبر 2026)، لأن أساس التكلفة مختلف (شوف الملاحظة تحت).
+- المشروع كله في صفحة واحدة: WB وEB وNB وSB والمول (22 نوفمبر 2026).
+- المجسم بيتحرك يوم بيوم، وكل الأرقام في الصفحة بالشهر: الكروت والجدول الشهري وقايمة أنشطة الشهر (24 نوفمبر 2026).
+- مجسم الفعلي بس هو اللي بيظهر، وأرقام الـ baseline لسه شغالة في المخطط (24 نوفمبر 2026).
+- الكروت المهمة بتظهر شفافة على المجسم في الأماكن الفاضية، والإعدادات في الجنب، ومفتاح الألوان اتشال (23 نوفمبر 2026).
+- الموقع العام واللاندسكيب بيبدأوا بعد آخر نشاط خرسانة في الموقع كله (23 نوفمبر 2026): `--site-start global`.
+- وقفات البامب من دراسة وقوف البامب، الملف `examples/reveal-all/pump_stands.json` (23 نوفمبر 2026):
+  - EB من الشارع الخارجي الشرقي.
+  - الطريقين الجانبيين الداخليين ضيقين (الطريق 8.6 م، والمسافة بين البدرومين 11.5 م).
+  - الطريق الأوسط ينفع بشروط.
+  - NB1 وNB2 وNB3 ملهمش وقفة من ديسمبر 2027 ليونيو 2028، والقرار لسه مفتوح.
 
-## Assumptions (ASSUMED / ESTIMATE, shown as such on the page)
-- Excavation pit per schedule group = basement footprint + 1.0 m work space; bottom = footing underside − 0.10 PCC − 1.5 m soil replacement; vertical sides.
-- No-standing strip around an open pit = pit depth (1:1 from the bottom). Stand after backfill: 2 m off the basement wall.
-- Pour day = last day of each concrete activity. In-progress % at the data date = elapsed working days.
-- Site works stages: infrastructure + kerbs 0–60 d, paving + pools 45–120 d, softscape 100–180 d (PROPOSED activities `SW-*`, not in the Master, no budget).
-- Finishing colours by activity name: block work = raw, بياض = plaster grey, رخام/جرانيت/سيراميك = stone, بازلت = basalt, دهان / مونة ملونة = final colour; finishing under way = blue.
-- Retaining wall 0.3 m on the basement perimeter and soil layer 0.5 m under footings where the drawings carry none.
+## الافتراضات (ASSUMED / ESTIMATE، ومكتوبة كده في الصفحة)
+- **الحفر:** حفرة لكل مجموعة جدول = بصمة البدروم + 1.0 م مسافة شغل. القاع = أسفل القواعد − 0.10 م خرسانة عادية − 1.5 م إحلال. الجوانب رأسية.
+- **منطقة ممنوع الوقوف:** حوالين الحفر المفتوح بعرض عمق الحفر (ميل 1:1 من القاع). بعد الردم الوقفة على بعد 2 م من حائط البدروم.
+- **يوم الصب:** آخر يوم في نشاط الخرسانة.
+- **نسبة الأنشطة الشغالة عند الـ data date:** بأيام الشغل اللي فاتت.
+- **مراحل الموقع العام:** أنشطة مقترحة `SW-*` مش في الماستر ومن غير ميزانية:
+  - شبكات + بردورات: يوم 0 – 60.
+  - بلاط + حمامات سباحة: يوم 45 – 120.
+  - زرع: يوم 100 – 180.
+- **ألوان التشطيبات من اسم النشاط:**
+  - مباني = لون الطوب.
+  - بياض = رمادي أسمنتي.
+  - رخام / جرانيت / سيراميك = لون حجر.
+  - بازلت = غامق.
+  - دهان / مونة ملونة = اللون النهائي.
+  - تشطيب جاري = أزرق.
+- **حائط ساند وطبقة تربة:** حائط ساند 0.3 م على محيط البدروم، وطبقة تربة 0.5 م تحت القواعد، في الأماكن اللي الرسومات مش شايلاهم.
 
-## Known gaps
-- Labour: zero (Master has no crews).
-- Clubhouse: not on the site plan (MASTER1.dxf checked 2026-11-23) and no Master activities.
-- Mall Z3 retaining wall / waterproofing / external backfill (~2.5 M) have no geometry; WB excavation is not in the Master.
-- No CPM logic in the Master (no critical path / float).
+## الناقص
+- **العمالة:** صفر، لأن الماستر مفيهوش أطقم.
+- **الكلوب هاوس:** مش موجود في الـ site plan (اتراجع MASTER1.dxf في 23 نوفمبر 2026)، وملهوش أنشطة في الماستر.
+- **المول Z3:** الحائط الساند والعزل والردم الخارجي (حوالي 2.5 مليون) ملهمش رسم.
+- **حفر WB:** مش موجود في الماستر.
+- **العلاقات بين الأنشطة:** الماستر مفيهوش CPM، يعني مفيش مسار حرج ولا float.
 
-## Cost basis note (for linking AC later)
-Cost Control (WB v28 / EB v03 / PRJ v01, data date 2026-10-04) is at cost price; the 5D is at Master (selling) rates.
-Options offered: scale AC by each block's Cost-Control CPI, use AC as is, or move the 5D to cost price. Waiting for Saeed.
+## ملاحظة أساس التكلفة (لما نربط الـ AC)
+- **الكوست كنترول:** WB v28 / EB v03 / PRJ v01، والـ data date بتاعه 4 أكتوبر 2026. أرقامه بسعر التكلفة.
+- **الـ 5D:** بأسعار الماستر (سعر البيع).
+- **الاختيارات المعروضة:**
+  1. أطبّق الـ CPI بتاع كل بلوك من الكوست كنترول.
+  2. أحط الـ AC زي ما هو.
+  3. أحوّل الـ 5D كله لسعر التكلفة.
+- **الحالة:** مستني قرار سعيد.

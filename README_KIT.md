@@ -1,6 +1,6 @@
 # BIM kit — 3D / 4D / 5D
 
-> REVEAL: read `CONTEXT.md` first (how this kit builds the REVEAL 5D page, sources, decisions, assumptions).
+> REVEAL: اقرأ `CONTEXT.md` الأول (إزاي الـ kit بيبني صفحة REVEAL 5D، المصادر، القرارات، الافتراضات).
 
 
 السكريبتات اللي بتشتغل بيها الـ skills الثلاثة:
