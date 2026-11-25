@@ -191,9 +191,17 @@ function setOrtho(){const w=vp.clientWidth,h=vp.clientHeight,d=ctl.target.distan
 let tw=null;
 function fly(pos,tgt,ms=900){const p0=cam.position.clone(),t0=ctl.target.clone(),s=performance.now();tw=t=>{const k=Math.min(1,(t-s)/ms),e=k*k*(3-2*k);cam.position.lerpVectors(p0,pos,e);ctl.target.lerpVectors(t0,tgt,e);if(k>=1)tw=null}}
 function box(sel){const b=new THREE.Box3();meshes.forEach(m=>{if(m.visible&&(!sel||sel(m.userData.e)))b.expandByObject(m)});return b}
-function fit(f){const b=box(f?e=>e.floor===f:null);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),r=Math.max(s.x,s.z,s.y)*0.9+8;fly(c.clone().add(new THREE.Vector3(-r*.55,r*.7,-r*.75)),c)}
-function view(n){const c=CEN.clone();c.y=(LV[TOPF]+LV.FND)/2*0.6;const r=75*SPN;
- const P={iso:[-45*SPN,38*SPN,62*SPN],top:[0,r+20,0.001],front:[0,8,r+10],side:[r+10,8,0]}[n];fly(c.clone().add(new THREE.Vector3(...P)),c)}
+function fit(f){const b=box(f?e=>e.floor===f:null);if(b.isEmpty())return;const P=camFit(persp,b.min,b.max,36,38);fly(P[0],P[1])}
+/* camera fit: smallest distance that keeps the whole box inside the view, looking along dir (target -> camera) */
+function camFit(cm,mn,mx,az,el,ty,sy=0){const D2=Math.PI/180,V=THREE.Vector3,dir=new V(-Math.sin(az*D2)*Math.cos(el*D2),Math.sin(el*D2),Math.cos(az*D2)*Math.cos(el*D2)).normalize();
+ const c=new V((mn.x+mx.x)/2,ty??(mn.y+(mx.y-mn.y)*.3),(mn.z+mx.z)/2),f=dir.clone().negate(),up=el>85?new V(0,0,-1):new V(0,1,0);
+ const r=new V().crossVectors(f,up).normalize(),u=new V().crossVectors(r,f),tv=Math.tan(cm.fov*D2/2)*.92,th=tv*(cm.aspect||1.6);let d=1;
+ for(const x of[mn.x,mx.x])for(const y of[mn.y,mx.y])for(const z of[mn.z,mx.z]){const q=new V(x,y,z).sub(c),a=q.dot(r),b=q.dot(u),w=q.dot(f);d=Math.max(d,Math.abs(a)/th-w,Math.abs(b)/tv-w)}
+ const s=u.clone().multiplyScalar(sy*tv*d/.92*2);   /* sy>0 moves the model down the screen (room for the panels on top) */
+ return[c.clone().addScaledVector(dir,d).add(s),c.clone().add(s)]}
+function view(n){const a={iso:[36,32],top:[0,88],front:[0,9],side:[-90,9]}[n];if(!a)return;let b=box();if(b.isEmpty())return;
+ const s=b.getSize(new THREE.Vector3());if(Math.max(s.x,s.z)>500)b=new THREE.Box3().setFromCenterAndSize(CEN,new THREE.Vector3(160,40,160));   /* guard against far-away stray meshes */
+ const P=camFit(persp,b.min,b.max,a[0],a[1]);fly(P[0],P[1])}
 document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>view(b.dataset.v));
 $('#ortho').onclick=ev=>{const o=cam===persp;const p=cam.position.clone(),t=ctl.target.clone();cam=o?ortho:persp;ctl.dispose();ctl=new OrbitControls(cam,cv);ctl.enableDamping=true;ctl.target.copy(t);cam.position.copy(p);ev.target.classList.toggle('on',o);setOrtho()};
 $('#secView').onclick=()=>{$('#secOn').checked=true;clip();const x=$('#secAx').value==='x',c=CEN.clone(),r=70;fly(c.clone().add(x?new THREE.Vector3(-r*($('#secFlip').checked?-1:1),6,0.01):new THREE.Vector3(0.01,6,-r*($('#secFlip').checked?-1:1))),c)};

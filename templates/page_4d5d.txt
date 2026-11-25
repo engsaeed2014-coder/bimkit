@@ -43,17 +43,40 @@ ul.al{list-style:none;margin:0;padding:0;font-size:12px}ul.al li{display:grid;gr
 .note{color:var(--mute);font-size:11px}
 @media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:55% 45%}aside{border-right:0;border-top:1px solid var(--line)}#tools{max-width:100%}#legend{display:none}.kpis{grid-template-columns:repeat(2,1fr)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---------- glass HUD: every card floats on the 3D view, placed in the empty parts of the frame ---------- */
+#hud{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+#hud .hg{position:absolute;display:flex;flex-wrap:wrap;gap:8px;direction:rtl;align-content:flex-start;justify-content:flex-start;transform-origin:top right;transition:opacity .3s ease}
+#hud #top{left:auto;right:auto;top:auto;pointer-events:none}
+#hud #legend{bottom:auto;flex-direction:column;flex-wrap:nowrap}
+#stage .chip,#hud .k,#bar{background:rgba(14,18,24,.36);-webkit-backdrop-filter:blur(10px) saturate(1.35);backdrop-filter:blur(10px) saturate(1.35);border:1px solid rgba(255,255,255,.22);color:#f3f5f7;box-shadow:0 6px 22px rgba(0,0,0,.18);border-radius:12px}
+#stage .chip b{color:#fff}#stage .chip b.bad{color:#ff8a80}#stage .chip b.good{color:#7ee2a8}#stage #datechip b{color:#ffcf6b}
+#bar button,#bar select{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);color:#f3f5f7}#bar #dlab{color:#fff}
+#hud .k{flex:0 0 148px;padding:8px 11px;pointer-events:auto}
+#hud .k small,#hud .k i{color:rgba(240,244,248,.8)}#hud .k b{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}
+#hud .k b.bad,#hud .k i.bad{color:#ff8a80}#hud .k b.good,#hud .k i.good{color:#7ee2a8}
+aside #tools{position:static;max-width:none;margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}   /* settings live in the panel, not on the view */
+#hud .hg.squeezed{opacity:.88}
+@media (prefers-reduced-motion:reduce){#hud .hg{transition:none}}
+
+#legend{display:none!important}
+#watch{flex-direction:column;align-items:stretch;gap:4px;padding:9px 11px;pointer-events:auto;width:250px}
+#watch h4{margin:0 0 2px;font:600 12px var(--font);color:rgba(240,244,248,.85)}
+#watch button{all:unset;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:4px 6px;border-radius:8px;font-size:12px}
+#watch button:hover,#watch button:focus-visible{background:rgba(255,255,255,.12);outline:none}
+#watch button b{font:700 13px var(--num);direction:ltr}#watch button small{grid-column:1/3;color:rgba(240,244,248,.75);font-size:11px}
+#watch .bar{grid-column:1/3;height:4px;border-radius:2px;background:rgba(255,255,255,.18);position:relative;direction:ltr}#watch .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:2px}
 </style>
 <div id="app">
 <div id="stage"><canvas id="cv" tabindex="0" aria-label="مجسم 4D للمشروع: الفعلي والمتوقع مقابل المخطط"></canvas>
-<div id="top"><div class="chip" id="datechip">تاريخ البيانات · <b id="dtxt">–</b></div><div class="chip" id="c_work">العمالة: <b id="c_w">–</b></div><div class="chip" id="c_prog">التقدم: <b id="c_p">–</b></div><div class="chip" id="c_act">أنشطة الشهر: <b id="c_a">–</b></div><div class="chip" id="c_pour">صبات الشهر: <b id="c_pr">–</b></div></div>
-<div id="tools"><button data-v="both" class="on">الاتنين</button><button data-v="upd">الفعلي والمتوقع</button><button data-v="base">المخطط</button><button data-v="top">من فوق</button><button id="tg_var" class="on">تلوين الفروقات</button><button id="tg_wk" class="on">العمالة</button><select id="cutsel" aria-label="قطع دور"><option value="">قطع دور: بدون</option></select></div>
-<div id="legend"></div>
-<div class="chip" id="bar"><button id="play">▶ تشغيل</button><select id="spd" aria-label="السرعة"><option value="0.5">×0.5</option><option value="1" selected>×1</option><option value="2">×2</option><option value="4">×4</option></select><select id="stp" aria-label="الخطوة"><option value="m" selected>شهري</option><option value="w">أسبوعي</option><option value="d">يومي</option></select><button id="gdd">تاريخ المتابعة</button><input id="sl" type="range" min="0" max="300" step="1" value="0" aria-label="التاريخ"><span id="dlab" style="min-width:110px;text-align:center;font-family:var(--num)"></span></div></div>
+<div id="top"><div class="chip" id="datechip">تاريخ البيانات · <b id="dtxt">–</b></div><div class="chip" id="c_work" hidden>العمالة: <b id="c_w">–</b></div><div class="chip" id="c_prog">التقدم: <b id="c_p">–</b></div><div class="chip" id="c_act" hidden>أنشطة الشهر: <b id="c_a">–</b></div><div class="chip" id="c_key">SPI <b id="c_k">–</b></div><div class="chip" id="c_pour">صبات الشهر: <b id="c_pr">–</b></div></div>
+
+<div id="legend" hidden></div><div id="hud" aria-label="مؤشرات المشروع"><div id="watch" class="chip"></div></div>
+<div class="chip" id="bar"><button id="play">▶ تشغيل</button><select id="spd" aria-label="السرعة"><option value="0.5">×0.5</option><option value="1" selected>×1</option><option value="2">×2</option><option value="4">×4</option></select><select id="stp" aria-label="الخطوة" hidden><option value="d" selected>يومي</option><option value="w">أسبوعي</option><option value="m">شهري</option></select><button id="gdd">تاريخ المتابعة</button><input id="sl" type="range" min="0" max="300" step="1" value="0" aria-label="التاريخ"><span id="dlab" style="min-width:110px;text-align:center;font-family:var(--num)"></span></div></div>
 <aside>
 <header><h1 id="h1t">4D</h1><p id="h1p">البيز لاين والفعلي والمتوقع، العمالة والونش، على نفس المجسم</p>
 <div id="xio5" class="v5" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button id="xi5" class="xb">⬆ استيراد كوست ريبورت</button><button id="xe5" class="xb">⬇ تصدير كوست ريبورت</button><button id="xr5" class="xb">↺ رجوع للأصل</button><input id="xf5" type="file" accept=".xlsx" hidden></div>
-<div id="xio" class="v4" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button id="xi" class="xb">⬆ استيراد Excel (تحديث)</button><button id="xe" class="xb">⬇ تصدير Excel</button><button id="xr" class="xb">↺ رجوع للأصل</button><input id="xf" type="file" accept=".xlsx" hidden></div><div id="xmsg" class="note" style="margin-top:6px"></div></header>
+<div id="xio" class="v4" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button id="xi" class="xb">⬆ استيراد Excel (تحديث)</button><button id="xe" class="xb">⬇ تصدير Excel</button><button id="xr" class="xb">↺ رجوع للأصل</button><input id="xf" type="file" accept=".xlsx" hidden></div><div id="xmsg" class="note" style="margin-top:6px"></div><div id="tools"><button data-v="upd" class="on">منظور</button><button data-v="top">من فوق</button><button id="tg_var" class="on">تلوين الفروقات</button><button id="tg_wk" class="on">العمالة</button><select id="cutsel" aria-label="قطع دور"><option value="">قطع دور: بدون</option></select></div></header>
 <div class="v5" id="c5"><section class="blk"><div class="kpis" id="kp5"></div></section>
 <section class="blk"><h3>منحنى التكلفة التراكمي (جنيه): المخطط / المنجز / الفعلي</h3><canvas class="ch" id="cc1" style="height:190px"></canvas><div class="leg"><span><i class="sw" style="background:var(--blu)"></i>المخطط PV</span><span><i class="sw" style="background:var(--acc)"></i>المنجز EV</span><span><i class="sw" style="background:var(--red)"></i>الفعلي AC</span><span>المنقط = متوقع</span></div></section>
 <section class="blk"><h3>الجدول الشهري: التكلفة (مليون جنيه)</h3><div style="overflow-x:auto;max-height:260px;overflow-y:auto" id="mt5"></div></section>
@@ -80,7 +103,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';import {mer
 const D=JSON.parse(document.getElementById('d4').textContent);const MODE5=D.mode==='5d';if(MODE5)document.body.classList.add('m5');
 const $=s=>document.querySelector(s);
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const C=D.cfg,CX=C.cx,[BX0,BX1,BY0,BY1]=C.bbox,SPN=Math.max(1,(BX1-BX0)/61.3,(BY1-BY0)/60),OFFJ=new Set((C.off_weekdays||[4]).map(p=>(p+1)%7)),ND=D.dates.length, DD=D.dd, OX=[0,Math.round(BX1-BX0+34)];const GX0=-120*SPN,GX1=260*SPN+OX[1]-95,RZ=BY1+15.16,MX=CX+OX[1]/2;       // building 0 = update (left), 1 = baseline (right)
+const C=D.cfg,CX=C.cx,[BX0,BX1,BY0,BY1]=C.bbox,SPN=Math.max(1,(BX1-BX0)/61.3,(BY1-BY0)/60),OFFJ=new Set((C.off_weekdays||[4]).map(p=>(p+1)%7)),ND=D.dates.length, DD=D.dd, SOLO=true,OX=[0,SOLO?Math.round(60000*SPN):Math.round(BX1-BX0+34)];const GX0=-120*SPN,GX1=260*SPN+(SOLO?0:OX[1])-95,RZ=BY1+15.16,MX=CX+(SOLO?0:OX[1]/2);   /* SOLO: only the actual model is drawn; the baseline copy is parked far beyond the camera (its numbers still run) */       // building 0 = update (left), 1 = baseline (right)
 const T0=new Date(D.start+'T00:00:00Z').getTime(), DAY=864e5;
 const dms=D.dates.map(s=>new Date(s+'T00:00:00Z').getTime());
 const fmt=ms=>new Date(ms).toLocaleDateString('ar-EG-u-nu-latn',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
@@ -92,17 +115,24 @@ const KIND=C.kind;const WMASK=[0,1,2,3,4,5,6].map(i=>(C.off_weekdays||[4]).inclu
 const WT=C.weights;
 // ---------- elements prep ----------
 const EL=D.els;
-EL.forEach(e=>{const w=WT[e.gr];e.ts=e.k.map((c,i)=>({c,w:w[i],kind:KIND[D.acts[c].s],a:D.acts[c].a}))});
+/* finishing stage of a task, from its name: the colour an element takes once that task is done (ASSUMED mapping) */
+const FST=(n,s)=>{if(s==='Structure'||!n)return null;n=n.toLowerCase();
+ if(/بازلت|basalt/.test(n))return'fBa';if(/دهان|paint|أكريليك|اكريليك|مونة أسمنتية ملونة/.test(n))return'fin';
+ if(/رخام|جرانيت|سيراميك|marble|granite|ceramic|بورسلين|porcelain/.test(n))return'fSt';if(/بياض|plaster|لياسة|محارة/.test(n))return'fPl';
+ if(/block work|مباني|beacons|electrical prep/.test(n))return'raw';return'keep'};
+EL.forEach(e=>{const w=WT[e.gr];e.ts=e.k.map((c,i)=>({c,w:w[i],kind:KIND[D.acts[c].s],a:D.acts[c].a,fs:FST(D.acts[c].n.split(' · ').pop(),D.acts[c].s)}))});
 const TOTV=EL.reduce((a,e)=>a+e.v,0);
 // state of element e in building b (0 update, 1 baseline) at day index d
 function frac(a,b,d){const s=b===1?a[0]:a[2],f=b===1?a[1]:a[3];if(d<s)return 0;if(d>f)return 1;return (d-s+1)/(f-s+1)}
-function elState(e,b,d){let p=0,k=-1,fk=0;
- for(let i=0;i<e.ts.length;i++){const t=e.ts[i],fr=frac(t.a,b,d);p+=t.w*fr;if(fr>0){k=i;fk=fr}}
+function elState(e,b,d){let p=0,k=-1,fk=0,fz=null,fw=false;
+ for(let i=0;i<e.ts.length;i++){const t=e.ts[i],fr=frac(t.a,b,d);p+=t.w*fr;if(fr>0){k=i;fk=fr;
+   if(t.fs&&t.fs!=='keep'){if(fr>=1)fz=t.fs;else fw=true}else if(t.fs==='keep'&&fr<1)fw=true}}
  if(k<0)return{p:0,st:0};
- const t=e.ts[k];let st; // 1 form,2 rebar,3 pour,4 done
+ const t=e.ts[k];let st; // 1 form,2 rebar,3 pour / finishing under way,4 done
  if(t.kind==='pour')st=fk>=1?4:3;else st=t.kind==='rebar'?2:1;
+ if(t.fs&&st===3&&fz===null&&k>0)fz=e.ts.slice(0,k).some(x=>x.fs)?'raw':null;
  const last=e.ts[e.ts.length-1].a;const fin=b===1?last[1]:last[3];
- return{p,st,fc:b===0&&fin>DD}}
+ return{p,st,fc:b===0&&fin>DD,fz,fw:fw&&!!t.fs,dd:b===0&&d>DD}}
 // ---------- renderer ----------
 const cv=$('#cv'),stage=$('#stage');
 const R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;R.localClippingEnabled=true;R.setPixelRatio(Math.min(devicePixelRatio,2));
@@ -110,13 +140,13 @@ const scene=new THREE.Scene();let cam=new THREE.PerspectiveCamera(38,1,.5,1200*S
 const ctl=new OrbitControls(cam,cv);ctl.enableDamping=true;ctl.target.set(MX,5,(BY0+BY1)/2);ctl.maxPolarAngle=Math.PI*.49;
 const hemi=new THREE.HemisphereLight(0xdfe9f3,0x6b6558,1);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff2dd,2.3);sun.position.set(-30,90,70);sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);
-Object.assign(sun.shadow.camera,{left:-60*SPN,right:180*SPN+OX[1]-95,top:80*SPN,bottom:-60*SPN,near:1,far:320*SPN});sun.shadow.bias=-.0006;sun.target.position.set(MX,0,(BY0+BY1)/2+5);scene.add(sun,sun.target);
+Object.assign(sun.shadow.camera,{left:-60*SPN,right:180*SPN+(SOLO?0:OX[1])-95,top:80*SPN,bottom:-60*SPN,near:1,far:320*SPN});sun.shadow.bias=-.0006;sun.target.position.set(MX,0,(BY0+BY1)/2+5);scene.add(sun,sun.target);
 // ---------- site ----------
 const M=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.95,...o});const GY=-.03;
 {const sh=new THREE.Shape([[GX0,-(BY1+109*SPN)],[GX1,-(BY1+109*SPN)],[GX1,69*SPN-BY0],[GX0,69*SPN-BY0]].map(p=>new THREE.Vector2(...p)));
  if(D.terrain){const T=D.terrain,m=T.m,c=[[0,0],[T.nx-1,0],[T.nx-1,T.ny-1],[0,T.ny-1]].map(([j,i])=>{const gx=T.x0+j*T.step,gy=T.y0+i*T.step;return[m[0]*gx+m[1]*gy+m[2],m[3]*gx+m[4]*gy+m[5]]});
-  OX.forEach(o=>sh.holes.push(new THREE.Path(c.map(q=>new THREE.Vector2(o+q[0],-q[1])))))}   /* the site surface grid fills this hole */
- else OX.forEach(o=>sh.holes.push(new THREE.Path([[o+BX0-3,-(BY1+5.7)],[o+BX1+3,-(BY1+5.7)],[o+BX1+3,-(BY0-5.9)],[o+BX0-3,-(BY0-5.9)]].map(p=>new THREE.Vector2(...p)))));
+  (SOLO?[0]:OX).forEach(o=>sh.holes.push(new THREE.Path(c.map(q=>new THREE.Vector2(o+q[0],-q[1])))))}   /* the site surface grid fills this hole */
+ else (SOLO?[0]:OX).forEach(o=>sh.holes.push(new THREE.Path([[o+BX0-3,-(BY1+5.7)],[o+BX1+3,-(BY1+5.7)],[o+BX1+3,-(BY0-5.9)],[o+BX0-3,-(BY0-5.9)]].map(p=>new THREE.Vector2(...p)))));
  const g=new THREE.Mesh(new THREE.ShapeGeometry(sh),M(0x74805f));g.rotation.x=-Math.PI/2;g.position.y=GY;g.receiveShadow=true;scene.add(g)}
 const pit=new THREE.Mesh(new THREE.PlaneGeometry((GX1-GX0)*1.1,300*SPN),M(0x6d6a62));pit.rotation.x=-Math.PI/2;pit.position.set((GX0+GX1)/2,D.levels.FND-1.15,0);pit.receiveShadow=true;scene.add(pit);
 const box=(x0,x1,z0,z1,y,c)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(x1-x0,y,z1-z0),M(c));m.position.set((x0+x1)/2,GY+y/2,(z0+z1)/2);m.receiveShadow=true;scene.add(m)};
@@ -148,6 +178,8 @@ const texRebar=tex(g=>{g.fillStyle='rgba(20,40,60,.30)';g.fillRect(0,0,128,128);
 const MAT={form:mk(0xffffff,{map:texForm,transparent:true,opacity:.9,emissive:0x2a1f0c}),rebar:mk(0xffffff,{map:texRebar,transparent:true,opacity:1,emissive:0x0c1a28,side:THREE.DoubleSide}),pour:mk(0xf2ecd2,{emissive:0x555040}),
  fc:mk(0xf0b43f,{transparent:true,opacity:.72,emissive:0x40300a})};
 for(const t in TC){MAT['d'+t]=mk(TC[t]);MAT['r'+t]=mk(0xd9544b,{emissive:0x200808});MAT['g'+t]=mk(0x45b277,{emissive:0x07200f})}
+MAT.fPl=mk(0xb9b4aa);MAT.fSt=mk(0xe6ddcc,{roughness:.35});MAT.fBa=mk(0x4d4b48,{roughness:.6});MAT.fWk=mk(0x7cc3ea,{emissive:0x0d2a3a,transparent:true,opacity:.92});   /* plaster, stone, basalt, finishing under way */
+const MATX={};for(const k in MAT){if(k==='form'||k==='rebar'||k==='pour'||k==='fc')continue;const m=MAT[k].clone();m.transparent=true;m.opacity=Math.min(m.opacity,.55);m.depthWrite=false;MATX[k]=m}   /* forecast (after the data date): same colour, see-through */
 const edgeMat=new THREE.LineBasicMaterial({color:0x1d2227,transparent:true,opacity:.5});
 const SH=g=>{const sh=new THREE.Shape(g.o.map(p=>new THREE.Vector2(p[0],-p[1])));g.h.forEach(h=>sh.holes.push(new THREE.Path(h.map(p=>new THREE.Vector2(p[0],-p[1])))));return sh};
 const bld=[new THREE.Group(),new THREE.Group()];bld.forEach((g,i)=>{g.position.x=OX[i];scene.add(g)});
@@ -344,9 +376,12 @@ function apply(d){
  for(let b=0;b<2;b++)EL.forEach((e,i)=>{const s=elState(e,b,d);st[b][i]=s;const F=(b?fl1:fl0)[e.f];F[0]+=s.p*e.v;F[1]+=e.v});
  FL.forEach(f=>{const u=fl0[f][0]/fl0[f][1]*100,bs=fl1[f][0]/fl1[f][1]*100;FSTAT[f]={u,b:bs,diff:u-bs}});
  for(let b=0;b<2;b++)EL.forEach((e,i)=>{const s=st[b][i],m=meshes[b][i];if(!s.st){m.visible=false;return}m.visible=true;
-  if(s.st===1)m.material=MAT.form;else if(s.st===2)m.material=MAT.rebar;else if(s.st===3)m.material=MAT.pour;
-  else if(b===0&&s.fc&&!SITE_T[e.t])m.material=MAT.fc;   /* site works and planting keep their own colours */
-  else{let pre='d';if(b===0&&showVar){const df=FSTAT[e.f].diff;pre=df<-10?'r':df>10?'g':'d'}m.material=MAT[pre+e.t]}});
+  if(s.st===1)m.material=MAT.form;else if(s.st===2)m.material=MAT.rebar;
+  else if(s.st===3&&!s.fw)m.material=MAT.pour;
+  else{/* finishing stage colour: raw block / plaster / stone / basalt / final paint (the element's own colour); forecast days get the see-through version */
+   const fk=s.fw?'fWk':(!s.fz||s.fz==='fin'||s.fz==='raw'?'d'+e.t:s.fz);let key=fk;
+   if(s.st===4&&!s.fw&&b===0&&showVar&&!s.dd&&!SITE_T[e.t]){const df=FSTAT[e.f].diff;if(df<-10)key='r'+e.t;else if(df>10)key='g'+e.t}
+   m.material=(b===0&&s.dd&&!SITE_T[e.t])?(MATX[key]||MAT[key]):MAT[key]}});
  // crane + workers
  [0,1].forEach(b=>{const c=cr[b];if(!C.crane_on){c.g.visible=false;c.gf=0;planWorkers(b,d);return}const A=D.acts['A1020'].a,Z=D.acts['A9000'].a;const s0=b?A[0]:A[2],f0=b?A[1]:A[3],s1=b?Z[0]:Z[2],f1=b?Z[1]:Z[3];
   let top=4;meshes[b].forEach((m,i)=>{if(m.visible&&EL[i].z1>top)top=EL[i].z1});c.top=top;
@@ -401,20 +436,20 @@ function actUI(d){const cnt={done:0,prog:0,open:0,late:0};
   return `<div style="display:grid;grid-template-columns:48px 1fr auto;gap:6px;padding:5px 0;border-bottom:1px solid var(--line);font-size:11.5px;align-items:center"><span style="font-family:var(--num);opacity:.6">${r.c}</span><span>${r.a.n}<br><small style="opacity:.7">مخطط ${r.pb}% · فعلي ${r.pu}%${r.df>0?` · <b style="color:var(--red)">تأخر ${r.df}ي${why?' ('+why+')':''}</b>`:r.df<0?` · <b style="color:var(--grn)">سبق ${-r.df}ي</b>`:''}</small></span><span style="background:${c[1]};color:#fff;border-radius:10px;padding:2px 8px;font-size:10.5px;white-space:nowrap">${c[0]}</span></div>`}).join('');
  const top=AC.filter(r=>r.src>0).sort((a,b)=>b.src-a.src).slice(0,8),mx=top.length?top[0].src:1;
  $('#dsrc').innerHTML=(top.length?top.map(r=>`<div style="font-size:11.5px;margin:4px 0"><div style="display:flex;justify-content:space-between"><span>${r.c} · ${r.a.n}</span><b style="font-family:var(--num)">+${r.src}ي</b></div><div style="height:6px;background:var(--line);border-radius:3px"><div style="height:6px;width:${r.src/mx*100}%;background:var(--red);border-radius:3px"></div></div><small style="opacity:.7">${r.od>0?'زيادة مدة التنفيذ +'+r.od+'ي ':''}${r.wt>0?'بداية متأخرة +'+r.wt+'ي':''}</small></div>`).join(''):'لا تأخير')+`<div style="font-size:11px;opacity:.7;margin-top:6px">التأخير الكلي ${D.delay} يوم = مجموع التأخير الذي أضافته الأنشطة الحرجة (زيادة المدة + التأخير في البداية بعد انتهاء السوابق).</div>`}
-{const tp=$('#top'),tl=$('#tools');if(tp&&tl&&window.ResizeObserver)new ResizeObserver(()=>{tl.style.top=(tp.offsetTop+tp.offsetHeight+8)+'px'}).observe(tp)}   /* tools row sits under the chips however many lines they take */
 function monthTable4(d){const cur=monOf(d);const r1=v=>v.toFixed(1);let h='<table style="width:100%;font-size:11.5px;border-collapse:collapse;font-family:var(--num)"><tr style="position:sticky;top:0;background:var(--panel,#fff)"><th style="text-align:right">الشهر</th><th>مخطط الشهر</th><th>فعلي الشهر</th><th>تراكمي مخطط</th><th>تراكمي فعلي</th><th>عمالة مخطط</th><th>عمالة فعلي</th><th>صبات</th><th>خرسانة م³</th></tr>';MONS.forEach((m,mi_)=>{const pe=prevEnd(m),b1=cum[1][m.i1],u1=cum[0][m.i1],b0=pe>=0?cum[1][pe]:0,u0=pe>=0?cum[0][pe]:0,fc=m.i0>DD,df=(u1-u0)-(b1-b0);h+=`<tr id="mr_${m.k}" style="border-top:1px solid var(--line)${m===cur?';background:rgba(232,163,61,.18);font-weight:600':''}"><td style="text-align:right">${monLab(m)}</td><td style="text-align:center">${r1(b1-b0)}%</td><td style="text-align:center" class="${df<-1?'bad':df>1?'good':''}">${r1(u1-u0)}%${fc?' <i>متوقع</i>':''}</td><td style="text-align:center">${r1(b1)}%</td><td style="text-align:center">${r1(u1)}%</td><td style="text-align:center">${Math.round(avgL(D.pl,m))}</td><td style="text-align:center">${Math.round(avgL(D.up,m))}</td><td style="text-align:center">${MST[0][mi_].p}<span style="color:var(--mute)"> / ${MST[1][mi_].p}</span></td><td style="text-align:center">${fmtN(MST[0][mi_].v)}</td></tr>`});$('#mt4').innerHTML=h+'</table>';const r=document.getElementById('mr_'+cur.k);if(r&&!monthTable4.s){monthTable4.s=1;r.scrollIntoView({block:'nearest'})}}
-function updateUI(d,st,fl0,fl1){actUI(d);[0,1].forEach(b=>{pitUpd(b,d);standUpd(b,d)});if(MODE5&&window.__cost5)setTimeout(()=>__cost5.draw(d),0);
+function updateUI(d,st,fl0,fl1){if(window.hudReq)window.hudReq();if(window.watchUpd)window.watchUpd(d);actUI(d);[0,1].forEach(b=>{pitUpd(b,d);standUpd(b,d)});if(MODE5&&window.__cost5)setTimeout(()=>__cost5.draw(d),0);
  const pb=cum[1][d],pu=cum[0][d],spi=pb>0?pu/pb:1,dd=d>DD;
  ($('#dtxt')||{}).textContent=fmt(dms[Math.min(d,ND-1)]);
  const wk0=D.pl[d],wk1=D.up[d],Mc=monOf(d);($('#c_w')||{}).textContent=`${Math.round(avgL(D.up,Mc))} فعلي${dd?' (متوقع)':''} / ${Math.round(avgL(D.pl,Mc))} مخطط · متوسط ${monLab(Mc)}`;
  ($('#c_p')||{}).textContent=`${pu.toFixed(1)}% فعلي / ${pb.toFixed(1)}% مخطط`;
- const Mm_=monOf(d),act=Object.values(D.acts).filter(a=>a.t==='task'&&(STP()==='m'?a.a[2]<=Mm_.i1&&a.a[3]>=Mm_.i0:d>=a.a[2]&&d<=a.a[3]));   /* list: running in the month (monthly step) or today */
+ const Mm_=monOf(d),act=Object.values(D.acts).filter(a=>a.t==='task'&&a.a[2]<=Mm_.i1&&a.a[3]>=Mm_.i0);   /* list: activities running in the month of the shown day */
 {const mi=MONS.indexOf(monOf(d)),u=MST[0][mi],p=MST[1][mi],top=Object.entries(u.bl).sort((x,y)=>y[1]-x[1]).slice(0,4).map(([k,v])=>k+' '+v).join('، ');
  ($('#c_a')||{}).textContent=`${u.n} ${dd?'فعلي (متوقع)':'فعلي'} / ${p.n} مخطط`;
  ($('#c_pr')||{}).textContent=`${u.p} فعلي / ${p.p} مخطط · ${fmtN(u.v)} م³`+(top?` (${top})`:'')}
  const pk0=Math.max(...D.pl),pk1=Math.max(...D.up);
  const M_=monOf(d),pe_=prevEnd(M_),mpb=pb-(pe_>=0?cum[1][pe_]:0),mpu=pu-(pe_>=0?cum[0][pe_]:0),ml0=avgL(D.pl,M_),ml1=avgL(D.up,M_);monthTable4(d);
  const dl=D.delay;
+ {const e=$('#c_k');if(e&&!MODE5){e.innerHTML=`${spi.toFixed(2)} <span style="opacity:.8">${spi<.95?'متأخر':spi>1.05?'سابق':'مطابق'}${dl>0?' · تأخير متوقع '+dl+' يوم':''}</span>`;e.className=spi<.95?'bad':spi>1.05?'good':''}}
  $('#kpis').innerHTML=[['التقدم المخطط',pb.toFixed(1)+'%',''],['التقدم الفعلي'+(dd?' (متوقع)':''),pu.toFixed(1)+'%',''],['SPI',spi.toFixed(2),`<i class="${spi<.95?'bad':spi>1.05?'good':''}">${spi<.95?'متأخر':spi>1.05?'سابق':'مطابق'}</i>`],
   ['تقدم '+monLab(monOf(d))+(dd?' (متوقع)':''),mpu.toFixed(1)+'%',`<i>المخطط ${mpb.toFixed(1)}%</i>`],['متوسط العمالة في الشهر',Math.round(ml1),`<i>المخطط ${Math.round(ml0)}</i>`],['ذروة العمالة',Math.round(pk1),`<i>المخطط ${Math.round(pk0)}</i>`],['التأخير المتوقع',dl+' يوم',`<i>على الانتهاء</i>`]].map(([a,b,c])=>`<div class="k"><small>${a}</small><b>${b}</b> ${c}</div>`).join('');
  FL.forEach(f=>{const s=FSTAT[f];$('#fb_'+f).style.width=s.b+'%';$('#fu_'+f).style.width=s.u+'%';$('#fn_'+f).textContent=`${s.u.toFixed(0)}/${s.b.toFixed(0)}`;$('#fd_'+f).style.background=s.diff<-10?css('--red'):s.diff>10?css('--grn'):'transparent'});
@@ -432,11 +467,16 @@ $('#play').onclick=e=>{playing=!playing;e.target.textContent=playing?'⏸ إيق
 $('#gdd').onclick=()=>setCD((dms[DD]-T0)/DAY,true);$('#stp').onchange=()=>setCD(cd);
 $('#tg_var').onclick=e=>{showVar=!showVar;e.target.classList.toggle('on',showVar);apply(idxAt(cd))};
 $('#tg_wk').onclick=e=>{showWk=!showWk;e.target.classList.toggle('on',showWk)};
-function VIEW(v){const W=BX1-BX0,Dp=BY1-BY0,zc=(BY0+BY1)/2,asp=cam.aspect||1.6,tv=Math.tan(19*Math.PI/180),th=tv*asp;
- const xc=v==='upd'?CX:v==='base'?CX+OX[1]:MX,w=(v==='upd'||v==='base')?W:OX[1]+W;
- if(v==='top'){const d=Math.max((w+10)/2/th,(Dp+10)/2/tv)*1.08;return[new THREE.Vector3(xc,d,zc+.01),new THREE.Vector3(xc,0,zc)]}
- const d=Math.max((w+16)/2/th,(Dp*.62+40)/2/tv)*1.05,n=Math.hypot(.05,.46,.89);
- return[new THREE.Vector3(xc-.05*d/n,5+.46*d/n,zc+.89*d/n),new THREE.Vector3(xc,5,zc)]}
+/* camera fit: smallest distance that keeps the whole box inside the view, looking along dir (target -> camera) */
+function camFit(cm,mn,mx,az,el,ty,sy=0){const D2=Math.PI/180,V=THREE.Vector3,dir=new V(-Math.sin(az*D2)*Math.cos(el*D2),Math.sin(el*D2),Math.cos(az*D2)*Math.cos(el*D2)).normalize();
+ const c=new V((mn.x+mx.x)/2,ty??(mn.y+(mx.y-mn.y)*.3),(mn.z+mx.z)/2),f=dir.clone().negate(),up=el>85?new V(0,0,-1):new V(0,1,0);
+ const r=new V().crossVectors(f,up).normalize(),u=new V().crossVectors(r,f),tv=Math.tan(cm.fov*D2/2)*.92,th=tv*(cm.aspect||1.6);let d=1;
+ for(const x of[mn.x,mx.x])for(const y of[mn.y,mx.y])for(const z of[mn.z,mx.z]){const q=new V(x,y,z).sub(c),a=q.dot(r),b=q.dot(u),w=q.dot(f);d=Math.max(d,Math.abs(a)/th-w,Math.abs(b)/tv-w)}
+ const s=u.clone().multiplyScalar(sy*tv*d/.92*2);   /* sy>0 moves the model down the screen (room for the panels on top) */
+ return[c.clone().addScaledVector(dir,d).add(s),c.clone().add(s)]}
+const VIEWS={both:[8,40],upd:[34,33],base:[34,33],top:[0,88]};   /* [azimuth from south, elevation] in degrees */
+function VIEW(v){const a=VIEWS[v];if(!a)return null;const V=THREE.Vector3,x0=(v==='base'?OX[1]:0)+BX0,x1=(v==='base'?OX[1]:0)+BX1;   /* only the actual model is shown */
+ return camFit(cam,new V(x0-4,0,BY0-4),new V(x1+4,26,BY1+4),a[0],a[1],undefined,.07)}
 let tw=null;function fly(p,t,ms=900){const p0=cam.position.clone(),t0=ctl.target.clone(),s=performance.now();tw=n=>{const k=Math.min(1,(n-s)/ms),e=k*k*(3-2*k);cam.position.lerpVectors(p0,p,e);ctl.target.lerpVectors(t0,t,e);if(k>=1)tw=null}}
 document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('on',x===b));const v=b.dataset.v;
  const p=VIEW(v);if(p)fly(p[0],p[1])});
@@ -444,7 +484,7 @@ $('#legend').innerHTML=[['--red','متأخر عن المخطط بأكتر من 1
 // labels
 const LBL=[];function label(t,x,y,z){const c=document.createElement('canvas');c.width=512;c.height=96;const g=c.getContext('2d');g.fillStyle='rgba(20,24,29,.88)';g.beginPath();g.roundRect(4,8,504,80,14);g.fill();g.fillStyle='#f0b43f';g.font='bold 40px IBM Plex Sans Arabic, sans-serif';g.textAlign='center';g.textBaseline='middle';g.direction='rtl';g.fillText(t,256,50);
  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));s.position.set(x,y,z);s.scale.set(26,4.9,1);s.renderOrder=10;scene.add(s);const tex=s.material.map;const h={set(a,b){const g=c.getContext('2d');g.clearRect(0,0,512,96);g.fillStyle='rgba(20,24,29,.9)';g.beginPath();g.roundRect(4,4,504,88,14);g.fill();g.textAlign='center';g.fillStyle='#f0b43f';g.font='bold 34px IBM Plex Sans Arabic, sans-serif';g.fillText(a,256,40);g.fillStyle='#fff';g.font='600 30px Space Grotesk, sans-serif';g.fillText(b,256,80);tex.needsUpdate=true}};LBL.push(h);return h}
-setTimeout(()=>{label('الفعلي والمتوقع (Update)',CX,RZ,10);label('المخطط (Baseline)',OX[1]+CX,RZ,10)},800);
+setTimeout(()=>{if(!SOLO)label('الفعلي والمتوقع (Update)',CX,RZ,10);if(!SOLO)label('المخطط (Baseline)',OX[1]+CX,RZ,10)},800);
 // loop
 let tgt=[null,null],tgtT=0;
 function loop(t){requestAnimationFrame(loop);const dt=Math.min(.1,(t-last)/1000||0);last=t;
@@ -459,7 +499,53 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.1,(t-last)/1000|
  animWorkers(t);pumps.forEach((p,b)=>updatePump(p,b,t,dt));R.render(scene,cam)}
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();updateUI(idxAt(cd),null,null,null)}
 new ResizeObserver(()=>{resize()}).observe(stage);
-setCD((dms[DD]-T0)/DAY,true);resize();{const p=VIEW('both');cam.position.copy(p[0]);ctl.target.copy(p[1])}loop(0);if(!MODE5)$('#h1t').textContent=C.name_ar+' · 4D';if(MODE5){$('#h1t').textContent=C.name_ar+' · 5D';$('#h1p').textContent='تكلفة المخطط مقابل الفعلي على نفس المجسم، بتاريخ البيانات';setTimeout(()=>__cost5.draw(idxAt(cd)),1000)}
+// ---------- watch card: buildings furthest behind (or ahead of) the plan at the shown date; click = fly to it ----------
+const WB_={};Object.values(D.acts).forEach(a=>{if(a.t!=='task'||!(a.bc>0)||!a.w)return;(WB_[a.w]=WB_[a.w]||{L:[],T:0}).L.push(a);WB_[a.w].T+=a.bc});
+const WBX={};EL.forEach(e=>{if(!e.ax||!WB_[e.ax])return;const b=WBX[e.ax]=WBX[e.ax]||[1e9,1e9,-1e9,-1e9,0];b[0]=Math.min(b[0],e.x);b[1]=Math.min(b[1],e.y);b[2]=Math.max(b[2],e.x);b[3]=Math.max(b[3],e.y);b[4]=Math.max(b[4],e.z1)});
+const frw=(s,f,d)=>d<s?0:d>f?1:(d-s+1)/(f-s+1);
+function watchUpd(d){const el=$('#watch');if(!el)return;const R=[];
+ for(const w in WB_){const B=WB_[w];let p=0,u=0;B.L.forEach(a=>{p+=a.bc*frw(a.a[0],a.a[1],d);u+=a.bc*frw(a.a[2],a.a[3],d)});p=p/B.T*100;u=u/B.T*100;if(p<.5&&u<.5||p>99.5&&u>99.5)continue;R.push({w,p,u,g:u-p})}
+ R.sort((a,b)=>a.g-b.g);const late=R.filter(r=>r.g<-.5).slice(0,4),ahead=R.filter(r=>r.g>.5).sort((a,b)=>b.g-a.g).slice(0,late.length?0:3);
+ const fc=d>DD?' (متوقع)':'',row=r=>{const c=r.g<0?'#ff8a80':'#7ee2a8';return `<button data-w="${r.w}" title="روح للعمارة"><span>${r.w}</span><b style="color:${c}">${r.g>0?'+':'−'}${Math.abs(r.g).toFixed(1)}</b>`+
+  `<span class="bar"><i style="width:${r.p.toFixed(1)}%;background:rgba(255,255,255,.45)"></i><i style="width:${r.u.toFixed(1)}%;height:2px;top:1px;background:${c}"></i></span><small>فعلي${fc} ${r.u.toFixed(0)}% · مخطط ${r.p.toFixed(0)}%</small></button>`};
+ el.innerHTML=late.length?`<h4>أكتر العماير تأخيرًا عن المخطط (نقطة)</h4>`+late.map(row).join(''):(ahead.length?`<h4>مفيش عماير متأخرة · الأكتر سبقًا</h4>`+ahead.map(row).join(''):`<h4>كل العماير مطابقة للمخطط</h4>`);
+ el.querySelectorAll('button').forEach(b=>b.onclick=()=>{const x=WBX[b.dataset.w];if(!x)return;const V=THREE.Vector3,P=camFit(cam,new V(OX[0]+x[0]-14,0,x[1]-14),new V(OX[0]+x[2]+14,x[4]+2,x[3]+14),34,38);fly(P[0],P[1])})}
+window.watchUpd=watchUpd;
+
+// ---------- glass HUD placement: project the models onto the screen, keep their footprint clear, put each card group in the best free spot ----------
+const HUD=$('#hud'),HG=[];
+{[['c',$('#top'),[1,2]],['w',$('#watch'),[1]]].forEach(([id,el,cols])=>{if(!el)return;el.classList.add('hg');HUD.appendChild(el);HG.push({id,el,cols})});
+ }
+let hudT=0,hudQ=false;const hudReq=()=>{if(hudQ)return;hudQ=true;requestAnimationFrame(()=>{hudQ=false;const n=performance.now();if(n-hudT<120){setTimeout(hudReq,130);return}hudT=n;hudPlace()})};
+function hudPlace(){const W=stage.clientWidth,H=stage.clientHeight;if(!W||!H)return;const CS=16,nx=Math.ceil(W/CS),ny=Math.ceil(H/CS),occ=new Uint8Array(nx*ny);
+ const mark=(x0,y0,x1,y1)=>{for(let j=Math.max(0,Math.floor(y0/CS));j<Math.min(ny,Math.ceil(y1/CS));j++)for(let i=Math.max(0,Math.floor(x0/CS));i<Math.min(nx,Math.ceil(x1/CS));i++)occ[j*nx+i]=1};
+ /* models: convex hull of the 8 projected corners of each copy */
+ [0].forEach(b=>{const P=[];for(const x of[OX[b]+BX0,OX[b]+BX1])for(const y of[0,24])for(const z of[BY0,BY1]){const v=new THREE.Vector3(x,y,z).project(cam);if(v.z<1)P.push([(v.x+1)/2*W,(1-v.y)/2*H])}
+  if(P.length<3)return;P.sort((a,b_)=>a[0]-b_[0]||a[1]-b_[1]);const cr=(o,a,b_)=>(a[0]-o[0])*(b_[1]-o[1])-(a[1]-o[1])*(b_[0]-o[0]),lo=[],up=[];
+  for(const q of P){while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],q)<=0)lo.pop();lo.push(q)}for(let k=P.length-1;k>=0;k--){const q=P[k];while(up.length>1&&cr(up[up.length-2],up[up.length-1],q)<=0)up.pop();up.push(q)}
+  const hull=lo.slice(0,-1).concat(up.slice(0,-1)),pad=CS*.6;
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){if(occ[j*nx+i])continue;const cx=(i+.5)*CS,cy=(j+.5)*CS;let inside=true;
+   for(let k=0;k<hull.length;k++){const a=hull[k],c=hull[(k+1)%hull.length],L=Math.hypot(c[0]-a[0],c[1]-a[1])||1;if(((c[0]-a[0])*(cy-a[1])-(c[1]-a[1])*(cx-a[0]))/L<-pad){inside=false;break}}if(inside)occ[j*nx+i]=1}});
+ /* fixed controls */
+ const sr=stage.getBoundingClientRect();['#bar'].forEach(s=>{const e=$(s);if(e&&e.offsetParent){const r=e.getBoundingClientRect();mark(r.left-sr.left-6,r.top-sr.top-6,r.right-sr.left+6,r.bottom-sr.top+6)}});
+ const sat=new Uint32Array((nx+1)*(ny+1));for(let j=0;j<ny;j++)for(let i=0;i<nx;i++)sat[(j+1)*(nx+1)+i+1]=occ[j*nx+i]+sat[j*(nx+1)+i+1]+sat[(j+1)*(nx+1)+i]-sat[j*(nx+1)+i];
+ const busy=(i,j,w,h)=>sat[(j+h)*(nx+1)+i+w]-sat[j*(nx+1)+i+w]-sat[(j+h)*(nx+1)+i]+sat[j*(nx+1)+i];
+ const ANCH={k:[W,0],c:[W,0],l:[0,H],w:[0,0]};   /* preferred corner: KPI and chips top-right (next to the panel), legend bottom-left */
+ HG.forEach(g=>{const el=g.el;el.classList.remove('squeezed');el.style.transform='';el.style.left='0px';el.style.top='0px';let best=null;   /* measure at the origin: shrink-to-fit width does not depend on the old spot */
+  for(const sc of[1,.88,.76]){for(const nc of g.cols){const wpx=g.id==='w'?250:g.id==='c'?(nc===1?Math.min(W-24,980):Math.min(W-24,480)):null;el.style.width=wpx?wpx+'px':'auto';
+    const w=Math.ceil(el.offsetWidth*sc/CS)+1,h=Math.ceil(el.offsetHeight*sc/CS)+1;if(w>nx||h>ny)continue;
+    for(let j=0;j+h<=ny;j++)for(let i=0;i+w<=nx;i++){if(busy(i,j,w,h))continue;const x=i*CS,y=j*CS,ax=ANCH[g.id][0],ay=ANCH[g.id][1];
+     const d=Math.hypot((ax?x+w*CS:x)-ax,(ay?y+h*CS:y)-ay)+(1-sc)*900+(g.cols.indexOf(nc))*40;if(!best||d<best.d)best={d,i,j,w,h,sc,wpx}}}
+   if(best&&best.sc===sc)break}
+  el.style.opacity='';el.style.pointerEvents='';
+  if(best){el.style.width=best.wpx?best.wpx+'px':'auto';el.style.transform=best.sc<1?`scale(${best.sc})`:'';const x=best.i*CS+4,y=best.j*CS+4;
+   el.style.left=(x+(best.sc<1?el.offsetWidth*(best.sc-1):0))+'px';el.style.top=y+'px';for(let j=best.j;j<best.j+best.h;j++)for(let i=best.i;i<best.i+best.w;i++)occ[j*nx+i]=1;
+   for(let j=0;j<ny;j++)for(let i=0;i<nx;i++)sat[(j+1)*(nx+1)+i+1]=occ[j*nx+i]+sat[j*(nx+1)+i+1]+sat[(j+1)*(nx+1)+i]-sat[j*(nx+1)+i]}
+  else if(g.id==='l'||g.id==='w'){el.style.opacity='0';el.style.pointerEvents='none'}   /* no free room: the legend gives way, the key cards stay */
+  else{el.classList.add('squeezed');el.style.transform='scale(.76)';el.style.left=(g.id==='l'?12:W-el.offsetWidth-12)+'px';el.style.top=(g.id==='l'?H-el.offsetHeight*.76-80:56)+'px'}})}
+ctl.addEventListener('change',hudReq);new ResizeObserver(hudReq).observe(stage);window.hudReq=hudReq;
+
+setCD((dms[DD]-T0)/DAY,true);resize();{const p=VIEW('upd');cam.position.copy(p[0]);ctl.target.copy(p[1])}loop(0);if(!MODE5)$('#h1t').textContent=C.name_ar+' · 4D';if(MODE5){$('#h1t').textContent=C.name_ar+' · 5D';$('#h1p').textContent='تكلفة المخطط مقابل الفعلي على نفس المجسم، بتاريخ البيانات';setTimeout(()=>__cost5.draw(idxAt(cd)),1000)}
 
 // ---------- Excel import / export ----------
 const XTR=Object.keys(C.trades);
@@ -521,6 +607,7 @@ const MN=['يناير','فبراير','مارس','أبريل','مايو','يون
 const dt=i=>D.dates[Math.min(Math.max(i,0),ND-1)];
 function kpis(d){const pv=PV[d],ev=EVf[d],ac=ACa[d],fc=d>DD;const Mo=__mon.monOf(d),pe=__mon.prevEnd(Mo),mpv=pv-(pe>=0?PV[pe]:0),mev=ev-(pe>=0?EVf[pe]:0),mac=ac-(pe>=0?ACa[pe]:0),ML=__mon.monLab(Mo);const cpi=ac>0?ev/ac:1,spi=pv>0?ev/pv:1;
  const pl=ev-ac,plp=ev>0?pl/ev*100:0,fpl=BAC-EAC;
+ {const e=document.querySelector('#c_k'),h=document.querySelector('#c_key');if(e&&h){h.firstChild.textContent='CPI ';e.innerHTML=`${cpi.toFixed(2)} <span style="opacity:.8">· SPI ${spi.toFixed(2)} · EV ${MM(ev)} / AC ${MM(ac)}</span>`;e.className=cpi<.97?'bad':cpi>1.03?'good':''}}
  const k=(t,v,s,c='')=>`<div class="k"><small>${t}</small><b class="${c}" style="direction:ltr;unicode-bidi:isolate;display:block;text-align:right">${v}</b> <i>${s||''}</i></div>`;
  $('#kp5').innerHTML=k('المخطط PV (المفروض)',MM(pv),P(pv/BAC)+' من الميزانية')+k('الفعلي AC',MM(ac),(fc?'متوقع · ':'')+'التكلفة الفعلية')+k('المنجز EV'+(fc?' (متوقع)':''),MM(ev),P(ev/BAC)+' من الميزانية')+
   k('الربح / الخسارة (EV − AC)',(pl<0?'−':'')+MM(Math.abs(pl)),'EV '+MM(ev)+' − AC '+MM(ac)+' · '+plp.toFixed(1)+'%',pl<0?'bad':'good')+
